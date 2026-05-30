@@ -8,11 +8,6 @@
 | 规则引擎版本 | `autotestdesign-engine-v3`（生成响应 `engineMetadata`） |
 | Prompt 版本 | `autotestdesign-v6-fr-complete` |
 | 目标应用 | FitnessAI |
-| 管线重构说明 | [GENERATION_PIPELINE_REFACTOR_SUMMARY.md](GENERATION_PIPELINE_REFACTOR_SUMMARY.md) |
-| FitnessAI 示例 Prompt | [FitnessAI_PROMPT_EXAMPLES.md](FitnessAI_PROMPT_EXAMPLES.md) |
-| 目标应用上下文 | [FitnessAI_LLM_CONTEXT.md](FitnessAI_LLM_CONTEXT.md) |
-| 作业原文 | [Assignment2.md](Assignment2.md) |
-| 详细开发记录 | [DEVELOPMENT_LOG.md](DEVELOPMENT_LOG.md) |
 
 ---
 
@@ -30,7 +25,6 @@
 10. [引擎与 Worker 模块](#10-引擎与-worker-模块)
 11. [导出与历史](#11-导出与历史)
 12. [测试与验证](#12-测试与验证)
-13. [作业交付物清单](#13-作业交付物清单)
 14. [相关文档](#14-相关文档)
 
 ---
@@ -60,7 +54,7 @@
 | 训练计划 | 难度、组数、休息、`skipRest` 组合 |
 | 仪表盘 | 趋势、分布、卡路里（MET × 体重 × 时长） |
 
-导入 [FitnessAI_LLM_CONTEXT.md](FitnessAI_LLM_CONTEXT.md) 或点击前端 **填入示例** 即可快速演示。
+导入 Markdown 或点击前端 **填入示例** 即可快速演示。
 
 ### 1.3 设计原则
 
@@ -103,8 +97,6 @@
 3. `ai-service/app/main.py` 构造 `GlobalContext`（含 QRA 阶段确认的 `requirementsStructured`、`riskItems`）
 4. `ai-service/app/engines/generation_pipeline.py` 按 `selectedTechniques` 路由到对应 Worker，Reduce 阶段合并工件
 5. 返回 `testcases`、`artifacts`（含 `coverageItems`、`testSequences`、`llmEnhancedTestcases` 等）、`engineMetadata`、`timingMetrics`
-
-> 旧 `pipeline.py` 已移除，主入口仅为 `run_generation_pipeline`。详见 [GENERATION_PIPELINE_REFACTOR_SUMMARY.md](GENERATION_PIPELINE_REFACTOR_SUMMARY.md)。
 
 ### 2.2 支持的 `selectedTechniques`
 
@@ -311,8 +303,6 @@ docker compose down -v       # 清空数据库（慎用）
 - **Overall Input Prompt**（侧栏）：描述 FitnessAI 项目、测试范围、风险与期望的输出风格（用例标题、输入、oracle、优先级、追溯）。
 - **Technical Prompt**（各黑盒技术）：仅写该技术相关约束（等价类域、边界簇、决策表规则、因子水平、状态迁移路径等）。
 
-完整英文示例见 [FitnessAI_PROMPT_EXAMPLES.md](FitnessAI_PROMPT_EXAMPLES.md)。
-
 ---
 
 ## 8. FitnessAI Prompt 示例
@@ -338,8 +328,6 @@ Use clear test case titles, explicit input data, expected results/oracles, prior
 | **Decision Table** | 记录保存：`count`/`durationSeconds` 与 saved/not saved；计划难度与 `skipRest` |
 | **Combinatorial** | `exerciseType`、`difficulty`、`skipRest`、记录分类、输入有效性等因素的 pairwise |
 | **State Transition** | UP/DESCENDING/DOWN/ASCENDING；合法完整循环、非法短路径、重复帧、cooldown 与 count 变化 |
-
-各技术完整英文 prompt 见 [FitnessAI_PROMPT_EXAMPLES.md](FitnessAI_PROMPT_EXAMPLES.md)。前端 **填入示例** 也会预填 `FITNESS_TECHNIQUE_PROMPT_SAMPLES`。
 
 ---
 
@@ -488,23 +476,9 @@ cd backend && node --check src/index.js
 - [ ] Summary 中 **LLM Enhancements** 可查看（或 preview 警告）
 - [ ] xlsx 四表可打开；History 可 View / Delete
 
-更完整场景见 [DEVELOPMENT_LOG.md](DEVELOPMENT_LOG.md)。
-
 ---
 
-## 13. 作业交付物清单
-
-| # | 交付物 | 权重 | 仓库状态 |
-| --- | --- | --- | --- |
-| 1 | AutoTestDesign 源码 + README + 演示视频 | 20% | ✅ 代码/README；⬜ 视频待录制 |
-| 2 | FitnessAI 风险分析报告 PDF | 10% | ⬜ 用 QRA / `riskItems` 撰写 |
-| 3 | FitnessAI 测试计划 PDF | 40% | ⬜ |
-| 4 | 详细测试设计与执行 PDF + PyTest | 30% | ⬜ 可参考 `fitnessai-java-tests/` |
-| — | 演示 PPT | — | ⬜ |
-
----
-
-## 14. 相关文档
+## 13. 相关文档
 
 | 文档 | 用途 |
 | --- | --- |
