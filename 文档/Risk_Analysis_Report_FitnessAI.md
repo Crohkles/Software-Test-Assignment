@@ -26,20 +26,8 @@ FitnessAI 是一个基于计算机视觉和 AI 的智能健身辅助系统，采
 
 本报告的风险矩阵由 **AutoTestDesign 工具的 QRA（Qualitative Risk Analysis）引擎**自动生成，流程如下：
 
-```
-① 将 FitnessAI CSV 格式需求输入工具
-        ↓
-② 工具 QRA 引擎解析需求，提取特征权重
-   （risk_engine: riskScore = impact × likelihood）
-        ↓
-③ 生成 10 条结构化风险项（2ms 内完成）
-        ↓
-④ 人工交互审查：将 REQ-POSE-001 的 Impact 由 4 调整为 5
-   → Recalculate → Risk Score 12 → 15
-   → Save Changes（截图见附录 A）
-        ↓
-⑤ 导出 Excel + JSON 作为原始证据
-```
+
+![QRA 生成流程图](./image/qra_generation_flow.svg)
 
 ### 1.3 风险评估方法
 
@@ -70,7 +58,7 @@ $$\text{Risk Score} = \text{Impact} \times \text{Likelihood}$$
 | REQ-REC-001-SAVE | record saving — 有效记录保存入库 | 3 | 3 | 9 | MEDIUM | rule-risk-engine |
 | REQ-PLAN-001 | training plan easy — 简单训练计划生成 | 3 | 3 | 9 | MEDIUM | rule-risk-engine |
 | REQ-PLAN-001-MED | training plan medium — 中等训练计划生成 | 3 | 3 | 9 | MEDIUM | rule-risk-engine |
-| REQ-PLAN-001-HARD | training plan hard — 困难训练计划生成 | 3 | 3 | 9 | MEDIUM | rule-risk-engine |
+| REQ-PLAN-001-HARD | exercise info third-item difficulty check — 第三项难度字段校验 | 3 | 3 | 9 | MEDIUM | rule-risk-engine |
 | REQ-DASH-001 | dashboard calories — 仪表板卡路里计算（MET×体重×时长）| 3 | 3 | 9 | MEDIUM | rule-risk-engine |
 
 **工具交互审查记录**：
@@ -88,9 +76,9 @@ $$\text{Risk Score} = \text{Impact} \times \text{Likelihood}$$
 
 | 风险 ID | 关联需求 | 风险描述 | Impact | Likelihood | Risk Score | Priority |
 |---------|---------|---------|--------|-----------|-----------|----------|
-| RA-EXT-001 | REQ-POSE-001 | **关键点数量验证不完整**：`isValid()` 仅检查 `size>=33`，不检查索引越界，后续 `landmarks.get(idx)` 可能抛出 `IndexOutOfBoundsException` | 4 | 3 | 12 | M |
+| RA-EXT-001 | REQ-POSE-001 | **关键点数量上界未限制**：请求校验保证最少 33 点，但 34/35 点仍会进入分析流程，导致上界语义与“固定 33 点”直觉不一致 | 4 | 3 | 12 | M |
 | RA-EXT-002 | REQ-POSE-001 | **2D 角度计算忽略 z 轴**：`calculateAngle()` 仅用 x/y 坐标，侧身动作时角度失真，导致误计或漏计 | 5 | 4 | 20 | **H** |
-| RA-EXT-003 | REQ-POSE-002 | **深蹲状态阈值无迟滞**：`ANGLE_THRESHOLD` 和 `STANDING_THRESHOLD` 同为 140°，边界处状态抖动，同一位置可能反复触发 | 3 | 4 | 12 | M |
+| RA-EXT-003 | REQ-POSE-002 | **深蹲状态边界需重点验证**：`ANGLE_THRESHOLD` 与 `STANDING_THRESHOLD` 同为 140°，当前依赖 `lastState` 与 `REQUIRED_FRAMES` 稳定状态，边界抖动场景仍需重点测试 | 3 | 4 | 12 | M |
 | RA-EXT-004 | REQ-REC-001 | **过滤条件为 AND 而非 OR**：`count<3 AND duration<30` 意味着 count≥3 但 duration<30 的记录仍会入库，业务合理性存疑 | 4 | 3 | 12 | M |
 | RA-EXT-005 | REQ-DASH-001 | **duration 单位混乱**：`daily_data` 返回分钟，`recent_records` 返回秒，同一 API 响应内单位不统一 | 4 | 4 | 16 | **H** |
 | RA-EXT-006 | REQ-DASH-001 | **默认体重 65kg 偏差大**：用户未设置体重时卡路里计算误差可达 ±40% | 3 | 4 | 12 | M |
@@ -132,7 +120,7 @@ $$\text{Risk Score} = \text{Impact} \times \text{Likelihood}$$
 | RA-EXT-002 | 2D 角度计算忽略 z 轴 | 20 |
 | RA-SEC-002 | Admin 接口无认证 | 20 |
 | RA-SEC-004 | CORS 开放所有来源 | 20 |
-| RA-EXT-005 | duration 单位不统一 | 16 |
+| RA-EXT-005 | dashboard 内部 duration 字段语义不一致 | 16 |
 | RA-PERF-001 | 高频请求无限流 | 16 |
 
 ---

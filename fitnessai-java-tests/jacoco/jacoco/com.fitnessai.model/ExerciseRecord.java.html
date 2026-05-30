@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExerciseRecord.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">FitnessAI Backend</a> &gt; <a href="index.source.html" class="el_package">com.fitnessai.model</a> &gt; <span class="el_source">ExerciseRecord.java</span></div><h1>ExerciseRecord.java</h1><pre class="source lang-java linenums">package com.fitnessai.model;
+
+import jakarta.persistence.*;
+import java.time.LocalDateTime;
+import java.time.LocalDate;
+import java.time.ZoneId;
+
+/**
+ * 运动记录实体类
+ */
+@Entity
+@Table(name = &quot;exercise_records&quot;)
+public class ExerciseRecord {
+    
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    
+    @Column(name = &quot;user_id&quot;, nullable = false, length = 100)
+    private String userId;
+    
+    @Column(name = &quot;exercise_type&quot;, nullable = false, length = 50)
+    private String exerciseType;  // squat/pushup/plank/jumping_jack
+    
+<span class="fc" id="L25">    @Column(nullable = false)</span>
+<span class="fc" id="L26">    private Integer count = 0;</span>
+    
+<span class="fc" id="L28">    @Column(nullable = false)</span>
+<span class="fc" id="L29">    private Integer duration = 0;  // 秒</span>
+    
+<span class="fc" id="L31">    private Integer score = 0;</span>
+    
+<span class="fc" id="L33">    private Double accuracy = 0.0;</span>
+    
+<span class="fc" id="L35">    @Column(name = &quot;is_correct&quot;)</span>
+<span class="fc" id="L36">    private Boolean correct = false;</span>
+    
+    private String feedback;
+    
+    @Column(name = &quot;record_date&quot;)
+    private LocalDate recordDate;
+    
+    @Column(name = &quot;recorded_at&quot;)
+    private LocalDateTime recordedAt;
+    
+    // Constructors
+<span class="fc" id="L47">    public ExerciseRecord() {}</span>
+    
+<span class="fc" id="L49">    public ExerciseRecord(String userId, String exerciseType, Integer count, Integer duration) {</span>
+<span class="fc" id="L50">        this.userId = userId;</span>
+<span class="fc" id="L51">        this.exerciseType = exerciseType;</span>
+<span class="fc" id="L52">        this.count = count;</span>
+<span class="fc" id="L53">        this.duration = duration;</span>
+<span class="fc" id="L54">    }</span>
+    
+    /**
+     * JPA 持久化前回调
+     * 在保存到数据库之前设置时间戳，确保时间戳准确反映持久化时间
+     * 使用北京时间 (UTC+8)
+     */
+    @PrePersist
+    protected void onCreate() {
+<span class="fc" id="L63">        ZoneId beijingZone = ZoneId.of(&quot;Asia/Shanghai&quot;);</span>
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">        if (recordDate == null) {</span>
+<span class="fc" id="L65">            recordDate = LocalDate.now(beijingZone);</span>
+        }
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">        if (recordedAt == null) {</span>
+<span class="fc" id="L68">            recordedAt = LocalDateTime.now(beijingZone);</span>
+        }
+<span class="fc" id="L70">    }</span>
+    
+    // Getters and Setters
+<span class="fc" id="L73">    public Long getId() { return id; }</span>
+<span class="nc" id="L74">    public void setId(Long id) { this.id = id; }</span>
+    
+<span class="nc" id="L76">    public String getUserId() { return userId; }</span>
+<span class="nc" id="L77">    public void setUserId(String userId) { this.userId = userId; }</span>
+    
+<span class="fc" id="L79">    public String getExerciseType() { return exerciseType; }</span>
+<span class="nc" id="L80">    public void setExerciseType(String exerciseType) { this.exerciseType = exerciseType; }</span>
+    
+<span class="fc" id="L82">    public Integer getCount() { return count; }</span>
+<span class="nc" id="L83">    public void setCount(Integer count) { this.count = count; }</span>
+    
+<span class="fc" id="L85">    public Integer getDuration() { return duration; }</span>
+<span class="nc" id="L86">    public void setDuration(Integer duration) { this.duration = duration; }</span>
+    
+<span class="fc" id="L88">    public Integer getScore() { return score; }</span>
+<span class="fc" id="L89">    public void setScore(Integer score) { this.score = score; }</span>
+    
+<span class="fc" id="L91">    public Double getAccuracy() { return accuracy; }</span>
+<span class="fc" id="L92">    public void setAccuracy(Double accuracy) { this.accuracy = accuracy; }</span>
+    
+<span class="nc" id="L94">    public Boolean isCorrect() { return correct; }</span>
+<span class="nc" id="L95">    public Boolean getCorrect() { return correct; }</span>
+<span class="nc" id="L96">    public void setCorrect(Boolean correct) { this.correct = correct; }</span>
+    
+<span class="nc" id="L98">    public String getFeedback() { return feedback; }</span>
+<span class="nc" id="L99">    public void setFeedback(String feedback) { this.feedback = feedback; }</span>
+    
+<span class="fc" id="L101">    public LocalDate getRecordDate() { return recordDate; }</span>
+<span class="nc" id="L102">    public void setRecordDate(LocalDate recordDate) { this.recordDate = recordDate; }</span>
+    
+<span class="fc" id="L104">    public LocalDateTime getRecordedAt() { return recordedAt; }</span>
+<span class="nc" id="L105">    public void setRecordedAt(LocalDateTime recordedAt) { this.recordedAt = recordedAt; }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

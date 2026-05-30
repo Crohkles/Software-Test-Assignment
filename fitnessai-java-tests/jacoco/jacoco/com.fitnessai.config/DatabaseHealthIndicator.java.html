@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DatabaseHealthIndicator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">FitnessAI Backend</a> &gt; <a href="index.source.html" class="el_package">com.fitnessai.config</a> &gt; <span class="el_source">DatabaseHealthIndicator.java</span></div><h1>DatabaseHealthIndicator.java</h1><pre class="source lang-java linenums">package com.fitnessai.config;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.actuate.health.Health;
+import org.springframework.boot.actuate.health.HealthIndicator;
+import org.springframework.stereotype.Component;
+
+import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.SQLException;
+
+/**
+ * 自定义数据库健康检查指示器
+ * 
+ * 用于监控 Neon Cloud PostgreSQL 数据库的连接状态
+ */
+@Component
+<span class="fc" id="L18">public class DatabaseHealthIndicator implements HealthIndicator {</span>
+
+    @Autowired
+    private DataSource dataSource;
+
+    @Override
+    public Health health() {
+<span class="nc" id="L25">        try (Connection connection = dataSource.getConnection()) {</span>
+<span class="nc bnc" id="L26" title="All 2 branches missed.">            if (connection.isValid(2)) { // 2秒超时</span>
+<span class="nc" id="L27">                return Health.up()</span>
+<span class="nc" id="L28">                        .withDetail(&quot;database&quot;, &quot;PostgreSQL&quot;)</span>
+<span class="nc" id="L29">                        .withDetail(&quot;provider&quot;, &quot;Neon Cloud&quot;)</span>
+<span class="nc" id="L30">                        .withDetail(&quot;status&quot;, &quot;Connected&quot;)</span>
+<span class="nc" id="L31">                        .withDetail(&quot;connection_valid&quot;, true)</span>
+<span class="nc" id="L32">                        .build();</span>
+            } else {
+<span class="nc" id="L34">                return Health.down()</span>
+<span class="nc" id="L35">                        .withDetail(&quot;database&quot;, &quot;PostgreSQL&quot;)</span>
+<span class="nc" id="L36">                        .withDetail(&quot;status&quot;, &quot;Connection invalid&quot;)</span>
+<span class="nc" id="L37">                        .build();</span>
+            }
+<span class="nc bnc" id="L39" title="All 2 branches missed.">        } catch (SQLException e) {</span>
+<span class="nc" id="L40">            return Health.down()</span>
+<span class="nc" id="L41">                    .withDetail(&quot;database&quot;, &quot;PostgreSQL&quot;)</span>
+<span class="nc" id="L42">                    .withDetail(&quot;error&quot;, e.getMessage())</span>
+<span class="nc" id="L43">                    .withDetail(&quot;status&quot;, &quot;Connection failed&quot;)</span>
+<span class="nc" id="L44">                    .build();</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

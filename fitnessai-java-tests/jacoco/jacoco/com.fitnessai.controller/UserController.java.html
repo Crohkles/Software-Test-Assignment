@@ -1,0 +1,292 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UserController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">FitnessAI Backend</a> &gt; <a href="index.source.html" class="el_package">com.fitnessai.controller</a> &gt; <span class="el_source">UserController.java</span></div><h1>UserController.java</h1><pre class="source lang-java linenums">package com.fitnessai.controller;
+
+import com.fitnessai.model.*;
+import com.fitnessai.service.UserService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+/**
+ * 用户API控制器
+ */
+@RestController
+@RequestMapping(&quot;/api/user&quot;)
+@CrossOrigin(origins = &quot;*&quot;, maxAge = 3600)
+<span class="fc" id="L25">public class UserController {</span>
+    
+<span class="fc" id="L27">    private static final Logger logger = LoggerFactory.getLogger(UserController.class);</span>
+    
+    @Autowired
+    private UserService userService;
+    
+    /**
+     * 获取用户资料
+     */
+    @GetMapping(&quot;/{userId}/profile&quot;)
+    public ResponseEntity&lt;?&gt; getUserProfile(@PathVariable String userId) {
+<span class="nc" id="L37">        logger.info(&quot;📋 获取用户资料: {}&quot;, userId);</span>
+        try {
+<span class="nc" id="L39">            User user = userService.getOrCreateUser(userId);</span>
+<span class="nc" id="L40">            return ResponseEntity.ok(user);</span>
+<span class="nc" id="L41">        } catch (Exception e) {</span>
+<span class="nc" id="L42">            logger.error(&quot;❌ 获取用户资料失败: {}&quot;, e.getMessage());</span>
+<span class="nc" id="L43">            return ResponseEntity.internalServerError().body(Map.of(&quot;error&quot;, e.getMessage()));</span>
+        }
+    }
+    
+    /**
+     * 更新用户资料
+     */
+    @PutMapping(&quot;/{userId}/profile&quot;)
+    public ResponseEntity&lt;?&gt; updateUserProfile(@PathVariable String userId, @RequestBody Map&lt;String, Object&gt; data) {
+<span class="nc" id="L52">        logger.info(&quot;📝 更新用户资料: {}&quot;, userId);</span>
+        try {
+<span class="nc" id="L54">            User user = userService.updateUserProfile(</span>
+                userId,
+<span class="nc" id="L56">                (String) data.get(&quot;name&quot;),</span>
+<span class="nc bnc" id="L57" title="All 2 branches missed.">                data.get(&quot;age&quot;) != null ? ((Number) data.get(&quot;age&quot;)).intValue() : null,</span>
+<span class="nc bnc" id="L58" title="All 2 branches missed.">                data.get(&quot;height&quot;) != null ? ((Number) data.get(&quot;height&quot;)).intValue() : null,</span>
+<span class="nc bnc" id="L59" title="All 2 branches missed.">                data.get(&quot;weight&quot;) != null ? ((Number) data.get(&quot;weight&quot;)).intValue() : null,</span>
+<span class="nc" id="L60">                (String) data.get(&quot;goal&quot;),</span>
+<span class="nc" id="L61">                (String) data.get(&quot;avatar&quot;)</span>
+            );
+<span class="nc" id="L63">            return ResponseEntity.ok(user);</span>
+<span class="nc" id="L64">        } catch (Exception e) {</span>
+<span class="nc" id="L65">            logger.error(&quot;❌ 更新用户资料失败: {}&quot;, e.getMessage());</span>
+<span class="nc" id="L66">            return ResponseEntity.internalServerError().body(Map.of(&quot;error&quot;, e.getMessage()));</span>
+        }
+    }
+    
+    /**
+     * 保存运动记录
+     * 注意：无效记录（count &lt; 3 且 duration &lt; 30）会被过滤，不保存到数据库
+     */
+    @PostMapping(&quot;/{userId}/records&quot;)
+    public ResponseEntity&lt;?&gt; saveExerciseRecord(@PathVariable String userId, @RequestBody Map&lt;String, Object&gt; data) {
+<span class="fc" id="L76">        logger.info(&quot;💪 保存运动记录: {}&quot;, userId);</span>
+        try {
+<span class="fc" id="L78">            String exerciseType = (String) data.get(&quot;exercise_type&quot;);</span>
+<span class="fc" id="L79">            int count = ((Number) data.getOrDefault(&quot;count&quot;, 0)).intValue();</span>
+<span class="fc" id="L80">            int duration = ((Number) data.getOrDefault(&quot;duration&quot;, 0)).intValue();</span>
+<span class="fc" id="L81">            int score = ((Number) data.getOrDefault(&quot;score&quot;, 0)).intValue();</span>
+<span class="fc" id="L82">            double accuracy = ((Number) data.getOrDefault(&quot;accuracy&quot;, 0.0)).doubleValue();</span>
+            
+<span class="fc" id="L84">            ExerciseRecord record = userService.saveExerciseRecord(userId, exerciseType, count, duration, score, accuracy);</span>
+            
+            // 如果记录被过滤（无效记录），返回204 No Content
+<span class="fc bfc" id="L87" title="All 2 branches covered.">            if (record == null) {</span>
+<span class="fc" id="L88">                logger.info(&quot;⏭️ 记录被过滤（无效记录：count={}, duration={}）&quot;, count, duration);</span>
+<span class="fc" id="L89">                return ResponseEntity.noContent().build();</span>
+            }
+            
+<span class="fc" id="L92">            Map&lt;String, Object&gt; response = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L93">            response.put(&quot;id&quot;, record.getId());</span>
+<span class="fc" id="L94">            response.put(&quot;exercise_type&quot;, record.getExerciseType());</span>
+<span class="fc" id="L95">            response.put(&quot;count&quot;, record.getCount());</span>
+            // 返回秒数，前端自己格式化显示（分钟和秒）
+<span class="pc bpc" id="L97" title="1 of 2 branches missed.">            response.put(&quot;duration&quot;, record.getDuration() != null ? record.getDuration() : 0);</span>
+<span class="fc" id="L98">            response.put(&quot;score&quot;, record.getScore());</span>
+<span class="fc" id="L99">            response.put(&quot;accuracy&quot;, record.getAccuracy());</span>
+            // 添加空值检查，避免 NullPointerException，使用北京时间
+<span class="fc" id="L101">            ZoneId beijingZone = ZoneId.of(&quot;Asia/Shanghai&quot;);</span>
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">            response.put(&quot;date&quot;, record.getRecordDate() != null ? record.getRecordDate().toString() : LocalDate.now(beijingZone).toString());</span>
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">            response.put(&quot;recorded_at&quot;, record.getRecordedAt() != null ? record.getRecordedAt().toString() : LocalDateTime.now(beijingZone).toString());  // 添加 recorded_at 字段，与前端接口一致</span>
+            
+<span class="fc" id="L105">            return ResponseEntity.ok(response);</span>
+<span class="nc" id="L106">        } catch (Exception e) {</span>
+<span class="nc" id="L107">            logger.error(&quot;❌ 保存运动记录失败: {}&quot;, e.getMessage());</span>
+<span class="nc" id="L108">            return ResponseEntity.internalServerError().body(Map.of(&quot;error&quot;, e.getMessage()));</span>
+        }
+    }
+    
+    /**
+     * 获取历史记录（支持筛选和排序）
+     */
+    @GetMapping(&quot;/{userId}/records&quot;)
+    public ResponseEntity&lt;?&gt; getHistoryRecords(
+            @PathVariable String userId,
+            @RequestParam(required = false) String exerciseType,
+            @RequestParam(required = false) Integer minScore,
+            @RequestParam(required = false) Integer maxScore,
+            @RequestParam(required = false) Double minAccuracy,
+            @RequestParam(required = false) Double maxAccuracy,
+            @RequestParam(required = false, defaultValue = &quot;date&quot;) String sortBy) {
+<span class="fc" id="L124">        logger.info(&quot;📊 获取历史记录: {}, 筛选: exerciseType={}, sortBy={}&quot;, userId, exerciseType, sortBy);</span>
+        try {
+<span class="fc" id="L126">            List&lt;ExerciseRecord&gt; records = userService.getFilteredHistoryRecords(</span>
+                    userId, exerciseType,
+                    minScore, maxScore, minAccuracy, maxAccuracy, sortBy
+            );
+            
+            // 转换为前端友好的格式
+            // 返回秒数，前端自己格式化显示（分钟和秒）
+<span class="fc" id="L133">            List&lt;Map&lt;String, Object&gt;&gt; result = records.stream().map(r -&gt; {</span>
+<span class="nc" id="L134">                Map&lt;String, Object&gt; map = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L135">                map.put(&quot;id&quot;, r.getId());</span>
+<span class="nc" id="L136">                map.put(&quot;exercise_type&quot;, r.getExerciseType());</span>
+<span class="nc" id="L137">                map.put(&quot;count&quot;, r.getCount());</span>
+                // 返回秒数，前端自己格式化显示
+<span class="nc bnc" id="L139" title="All 2 branches missed.">                map.put(&quot;duration&quot;, r.getDuration() != null ? r.getDuration() : 0);</span>
+<span class="nc" id="L140">                map.put(&quot;score&quot;, r.getScore());</span>
+<span class="nc" id="L141">                map.put(&quot;accuracy&quot;, r.getAccuracy());</span>
+                // 添加空值检查，避免 NullPointerException，使用北京时间
+<span class="nc" id="L143">                ZoneId beijingZone = ZoneId.of(&quot;Asia/Shanghai&quot;);</span>
+<span class="nc bnc" id="L144" title="All 2 branches missed.">                map.put(&quot;date&quot;, r.getRecordDate() != null ? r.getRecordDate().toString() : LocalDate.now(beijingZone).toString());</span>
+<span class="nc bnc" id="L145" title="All 2 branches missed.">                map.put(&quot;recorded_at&quot;, r.getRecordedAt() != null ? r.getRecordedAt().toString() : LocalDateTime.now(beijingZone).toString());</span>
+<span class="nc" id="L146">                return map;</span>
+<span class="fc" id="L147">            }).collect(Collectors.toList());</span>
+            
+<span class="fc" id="L149">            return ResponseEntity.ok(result);</span>
+<span class="nc" id="L150">        } catch (Exception e) {</span>
+<span class="nc" id="L151">            logger.error(&quot;❌ 获取历史记录失败: {}&quot;, e.getMessage());</span>
+<span class="nc" id="L152">            return ResponseEntity.internalServerError().body(Map.of(&quot;error&quot;, e.getMessage()));</span>
+        }
+    }
+    
+    /**
+     * 获取今日统计
+     */
+    @GetMapping(&quot;/{userId}/stats/today&quot;)
+    public ResponseEntity&lt;?&gt; getTodayStats(@PathVariable String userId) {
+<span class="nc" id="L161">        logger.info(&quot;📈 获取今日统计: {}&quot;, userId);</span>
+        try {
+<span class="nc" id="L163">            List&lt;DailyStats&gt; stats = userService.getTodayStats(userId);</span>
+<span class="nc" id="L164">            int totalCount = userService.getTodayTotalCount(userId);</span>
+            
+<span class="nc" id="L166">            ZoneId beijingZone = ZoneId.of(&quot;Asia/Shanghai&quot;);</span>
+<span class="nc" id="L167">            Map&lt;String, Object&gt; response = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L168">            response.put(&quot;date&quot;, LocalDate.now(beijingZone).toString());</span>
+<span class="nc" id="L169">            response.put(&quot;total_count&quot;, totalCount);</span>
+<span class="nc" id="L170">            response.put(&quot;by_exercise&quot;, stats.stream().map(s -&gt; {</span>
+<span class="nc" id="L171">                Map&lt;String, Object&gt; map = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L172">                map.put(&quot;exercise_type&quot;, s.getExerciseType());</span>
+<span class="nc" id="L173">                map.put(&quot;count&quot;, s.getTotalCount());</span>
+<span class="nc" id="L174">                map.put(&quot;duration&quot;, s.getTotalDuration());</span>
+<span class="nc" id="L175">                map.put(&quot;sessions&quot;, s.getSessionsCount());</span>
+<span class="nc" id="L176">                map.put(&quot;avg_accuracy&quot;, s.getAvgAccuracy());</span>
+<span class="nc" id="L177">                return map;</span>
+<span class="nc" id="L178">            }).collect(Collectors.toList()));</span>
+            
+<span class="nc" id="L180">            return ResponseEntity.ok(response);</span>
+<span class="nc" id="L181">        } catch (Exception e) {</span>
+<span class="nc" id="L182">            logger.error(&quot;❌ 获取今日统计失败: {}&quot;, e.getMessage());</span>
+<span class="nc" id="L183">            return ResponseEntity.internalServerError().body(Map.of(&quot;error&quot;, e.getMessage()));</span>
+        }
+    }
+    
+    /**
+     * 获取特定运动今日次数
+     */
+    @GetMapping(&quot;/{userId}/stats/today/{exerciseType}&quot;)
+    public ResponseEntity&lt;?&gt; getTodayExerciseCount(@PathVariable String userId, @PathVariable String exerciseType) {
+<span class="nc" id="L192">        logger.info(&quot;📈 获取今日 {} 次数: {}&quot;, exerciseType, userId);</span>
+        try {
+<span class="nc" id="L194">            int count = userService.getTodayCountByExercise(userId, exerciseType);</span>
+<span class="nc" id="L195">            ZoneId beijingZone = ZoneId.of(&quot;Asia/Shanghai&quot;);</span>
+<span class="nc" id="L196">            return ResponseEntity.ok(Map.of(</span>
+                &quot;exercise_type&quot;, exerciseType,
+<span class="nc" id="L198">                &quot;count&quot;, count,</span>
+<span class="nc" id="L199">                &quot;date&quot;, LocalDate.now(beijingZone).toString()</span>
+            ));
+<span class="nc" id="L201">        } catch (Exception e) {</span>
+<span class="nc" id="L202">            logger.error(&quot;❌ 获取今日运动次数失败: {}&quot;, e.getMessage());</span>
+<span class="nc" id="L203">            return ResponseEntity.internalServerError().body(Map.of(&quot;error&quot;, e.getMessage()));</span>
+        }
+    }
+    
+    /**
+     * 预览无效记录（不删除）
+     * 条件：count &lt; 3 且 duration &lt; 30
+     */
+    @GetMapping(&quot;/admin/cleanup/preview&quot;)
+    public ResponseEntity&lt;?&gt; previewInvalidRecords(
+            @RequestParam(defaultValue = &quot;3&quot;) int minCount,
+            @RequestParam(defaultValue = &quot;30&quot;) int minDuration) {
+<span class="nc" id="L215">        logger.info(&quot;🔍 预览无效记录 - 最小次数: {}, 最小时长: {}秒&quot;, minCount, minDuration);</span>
+        try {
+<span class="nc" id="L217">            List&lt;ExerciseRecord&gt; invalidRecords = userService.getInvalidRecords(minCount, minDuration);</span>
+<span class="nc" id="L218">            long count = userService.countInvalidRecords(minCount, minDuration);</span>
+            
+<span class="nc" id="L220">            List&lt;Map&lt;String, Object&gt;&gt; recordList = invalidRecords.stream().map(r -&gt; {</span>
+<span class="nc" id="L221">                Map&lt;String, Object&gt; map = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L222">                map.put(&quot;id&quot;, r.getId());</span>
+<span class="nc" id="L223">                map.put(&quot;user_id&quot;, r.getUserId());</span>
+<span class="nc" id="L224">                map.put(&quot;exercise_type&quot;, r.getExerciseType());</span>
+<span class="nc" id="L225">                map.put(&quot;count&quot;, r.getCount());</span>
+<span class="nc" id="L226">                map.put(&quot;duration&quot;, r.getDuration());</span>
+<span class="nc" id="L227">                map.put(&quot;score&quot;, r.getScore());</span>
+                // 添加空值检查，避免 NullPointerException，使用北京时间
+<span class="nc" id="L229">                ZoneId beijingZone = ZoneId.of(&quot;Asia/Shanghai&quot;);</span>
+<span class="nc bnc" id="L230" title="All 2 branches missed.">                map.put(&quot;date&quot;, r.getRecordDate() != null ? r.getRecordDate().toString() : LocalDate.now(beijingZone).toString());</span>
+<span class="nc" id="L231">                return map;</span>
+<span class="nc" id="L232">            }).collect(Collectors.toList());</span>
+            
+<span class="nc" id="L234">            return ResponseEntity.ok(Map.of(</span>
+<span class="nc" id="L235">                &quot;total_invalid_records&quot;, count,</span>
+<span class="nc" id="L236">                &quot;min_count_threshold&quot;, minCount,</span>
+<span class="nc" id="L237">                &quot;min_duration_threshold&quot;, minDuration,</span>
+                &quot;records&quot;, recordList
+            ));
+<span class="nc" id="L240">        } catch (Exception e) {</span>
+<span class="nc" id="L241">            logger.error(&quot;❌ 预览无效记录失败: {}&quot;, e.getMessage());</span>
+<span class="nc" id="L242">            return ResponseEntity.internalServerError().body(Map.of(&quot;error&quot;, e.getMessage()));</span>
+        }
+    }
+    
+    /**
+     * 执行清理无效记录
+     * 条件：count &lt; 3 且 duration &lt; 30
+     */
+    @DeleteMapping(&quot;/admin/cleanup&quot;)
+    public ResponseEntity&lt;?&gt; cleanupInvalidRecords(
+            @RequestParam(defaultValue = &quot;3&quot;) int minCount,
+            @RequestParam(defaultValue = &quot;30&quot;) int minDuration) {
+<span class="nc" id="L254">        logger.info(&quot;🧹 清理无效记录 - 最小次数: {}, 最小时长: {}秒&quot;, minCount, minDuration);</span>
+        try {
+            // 先统计要删除的数量
+<span class="nc" id="L257">            long countBefore = userService.countInvalidRecords(minCount, minDuration);</span>
+            
+            // 执行删除
+<span class="nc" id="L260">            int deletedCount = userService.cleanupInvalidRecords(minCount, minDuration);</span>
+            
+<span class="nc" id="L262">            logger.info(&quot;✅ 成功清理 {} 条无效记录&quot;, deletedCount);</span>
+            
+<span class="nc" id="L264">            return ResponseEntity.ok(Map.of(</span>
+<span class="nc" id="L265">                &quot;deleted_count&quot;, deletedCount,</span>
+<span class="nc" id="L266">                &quot;min_count_threshold&quot;, minCount,</span>
+<span class="nc" id="L267">                &quot;min_duration_threshold&quot;, minDuration,</span>
+<span class="nc" id="L268">                &quot;message&quot;, String.format(&quot;成功清理 %d 条无效记录&quot;, deletedCount)</span>
+            ));
+<span class="nc" id="L270">        } catch (Exception e) {</span>
+<span class="nc" id="L271">            logger.error(&quot;❌ 清理无效记录失败: {}&quot;, e.getMessage());</span>
+<span class="nc" id="L272">            return ResponseEntity.internalServerError().body(Map.of(&quot;error&quot;, e.getMessage()));</span>
+        }
+    }
+    
+    /**
+     * 获取仪表板数据
+     * 包括：进度、卡路里消耗、历史锻炼数据
+     */
+    @GetMapping(&quot;/{userId}/dashboard&quot;)
+    public ResponseEntity&lt;?&gt; getDashboard(@PathVariable String userId) {
+<span class="fc" id="L282">        logger.info(&quot;📊 获取仪表板数据: {}&quot;, userId);</span>
+        try {
+<span class="fc" id="L284">            Map&lt;String, Object&gt; dashboard = userService.getDashboardData(userId);</span>
+<span class="fc" id="L285">            return ResponseEntity.ok(dashboard);</span>
+<span class="nc" id="L286">        } catch (Exception e) {</span>
+<span class="nc" id="L287">            logger.error(&quot;❌ 获取仪表板数据失败: {}&quot;, e.getMessage());</span>
+<span class="nc" id="L288">            return ResponseEntity.internalServerError().body(Map.of(&quot;error&quot;, e.getMessage()));</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

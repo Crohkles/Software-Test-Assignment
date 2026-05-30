@@ -53,7 +53,7 @@ FitnessAI 是一款通过摄像头实时采集用户运动画面、借助 MediaP
 **不在测试范围内（Out of Scope）**：
 - MediaPipe 模型本身的姿态识别精度
 - 前端 UI 像素级视觉回归
-- Neon 云数据库基础设施稳定性
+- PostgreSQL 基础设施稳定性
 - 移动端浏览器兼容性
 
 ---
@@ -62,27 +62,8 @@ FitnessAI 是一款通过摄像头实时采集用户运动画面、借助 MediaP
 
 ### 2.1 系统架构概述
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                   浏览器（React + TypeScript）              │
-│  摄像头 → MediaPipe Pose → 33 关键点 → API 请求            │
-└────────────────────────┬────────────────────────────────┘
-                         │ HTTP REST (port 8080)
-                         ▼
-┌─────────────────────────────────────────────────────────┐
-│              Spring Boot 后端（Java 17）                   │
-│  ExerciseController  │  UserController  │  MainController │
-│       ↓                       ↓                           │
-│  PoseAnalyzerFactory        UserService                   │
-│  SquatAnalyzer / PushupAnalyzer / PlankAnalyzer / JJAnalyzer│
-│                             ExerciseRecordRepository      │
-│                             DailyStatsRepository          │
-└────────────────────────┬────────────────────────────────┘
-                         │ JPA/JDBC
-                         ▼
-               PostgreSQL (Neon 云数据库)
-               exercise_records | daily_stats | users
-```
+
+![系统架构概述图](./image/test_plan_architecture.svg)
 
 ### 2.2 主要功能性测试项
 
@@ -93,7 +74,7 @@ FitnessAI 是一款通过摄像头实时采集用户运动画面、借助 MediaP
 | TI-F03 | 保存训练记录 | `POST /api/user/{id}/records` | 过滤逻辑（count<3 AND duration<30）|
 | TI-F04 | 历史记录查询 | `GET /api/user/{id}/records` | 筛选条件组合、sortBy 枚举 |
 | TI-F05 | 今日统计 | `GET /api/user/{id}/stats/today` | 统计聚合正确性 |
-| TI-F06 | 仪表板数据 | `GET /api/user/{id}/dashboard` | 卡路里计算、时长单位统一 |
+| TI-F06 | 仪表板数据 | `GET /api/user/{id}/dashboard` | 卡路里计算、`duration` 字段语义检查 |
 | TI-F07 | 用户资料 | `GET/PUT /api/user/{id}/profile` | CRUD、自动创建 |
 | TI-F08 | 管理清理 | `DELETE /api/user/admin/cleanup` | 权限验证（安全风险）|
 
@@ -111,10 +92,10 @@ AutoTestDesign 工具根据输入的 FitnessAI 需求，自动选择以下 6 种
 | 测试套件 | 技术 | 工具生成用例数 | 针对需求/风险 |
 |---------|------|-------------|------------|
 | TS-01 | **EP（等价划分）** | **20 条** | REQ-POSE-001/INV, REQ-REC-001/SAVE, REQ-PLAN-001/MED/HARD, REQ-DASH-001 |
-| TS-02 | **BVA（边界值分析）** | **30 条** | landmarks.length(32/33/34), count(2/3/4), durationSeconds(29/30/31) |
+| TS-02 | **BVA（边界值分析）** | **30 条** | landmarks.length(31/32/33/34/35), count(2/3/4), durationSeconds(29/30/31) |
 | TS-03 | **Decision Table（决策表）** | **16 条** | count<3/≥3 × duration<30/≥30 四规则组合；exerciseType × landmarks 有效性 |
-| TS-04 | **Pairwise（组合测试）** | **6 条** | difficulty × skipRest 参数组合 |
-| TS-05 | **State Transition（状态转换）** | **5 条** | UP→DESCENDING→DOWN→ASCENDING→UP 状态路径 |
+| TS-04 | **Pairwise（组合测试）** | **6 条** | history records 过滤参数对：exerciseType × minScore × sortBy |
+| TS-05 | **State Transition（状态转换）** | **5 条** | UP→DESCENDING→DOWN→ASCENDING→UP 状态路径 + reset 场景 |
 | TS-06 | **WhiteBox Java（白盒 Java 分析）** | **4 条** | `saveExerciseRecord` 分支覆盖（Statement + Branch Coverage）|
 | | **合计** | **81 条** | |
 
@@ -152,7 +133,9 @@ AutoTestDesign 工具根据输入的 FitnessAI 需求，自动选择以下 6 种
 | TC ID | 标题 | 输入 | 期望结果 |
 |-------|------|------|---------|
 | TC-BVA-001 | landmarks.length=31（下界-1，无效）| landmarks 数组 31 个 | 返回可解释错误，拒绝处理 |
-| TC-BVA-002 | landmarks.length=32（下界，有效）| landmarks 数组 32 个 | HTTP 200 |
+| TC-BVA-002 | landmarks.length=32（下界，异常拦截）| landmarks 数组 32 个 | HTTP 4xx |
+| TC-BVA-005 | landmarks.length=34（上界，兼容解析）| landmarks 数组 34 个 | HTTP 200 |
+| TC-BVA-006 | landmarks.length=35（上界+1，兼容前 33 点）| landmarks 数组 35 个 | HTTP 200 |
 | TC-BVA-013 | durationSeconds=29（边界-1，无效）| count=2, duration=29 | 记录被过滤，不写入数据库 |
 | TC-BVA-014 | durationSeconds=30（边界，有效）| count=2, duration=30 | 记录保存成功 |
 | TC-BVA-016 | count=2（边界-1，无效）| count=2, duration=20 | 记录被过滤，不写入数据库 |
@@ -181,16 +164,16 @@ AutoTestDesign 工具根据输入的 FitnessAI 需求，自动选择以下 6 种
 
 ### 3.5 TS-04：Pairwise 组合测试（工具生成 6 条）
 
-工具对 `difficulty`（easy/medium/hard）× `skipRest`（true/false）进行 Pairwise 组合，生成 6 条用例，覆盖所有参数对：
+工具对历史记录查询参数 `exerciseType`（squat/pushup/plank）× `minScore`（80/90）× `sortBy`（date/score）进行 Pairwise 组合，生成 6 条用例，覆盖关键参数对：
 
-| TC ID | difficulty | skipRest | 期望结果 |
-|-------|-----------|---------|---------|
-| TC-CB-001 | easy | true | 各组合返回一致数据结构且无 5xx |
-| TC-CB-002 | easy | false | 各组合返回一致数据结构且无 5xx |
-| TC-CB-003 | medium | true | 各组合返回一致数据结构且无 5xx |
-| TC-CB-004 | medium | false | 各组合返回一致数据结构且无 5xx |
-| TC-CB-005 | hard | true | 各组合返回一致数据结构且无 5xx |
-| TC-CB-006 | hard | false | 各组合返回一致数据结构且无 5xx |
+| TC ID | exerciseType | minScore | sortBy | 期望结果 |
+|-------|--------------|----------|--------|---------|
+| TC-CB-001 | squat | 80 | date | 返回 200，数据结构稳定 |
+| TC-CB-002 | squat | 90 | score | 返回 200，数据结构稳定 |
+| TC-CB-003 | pushup | 80 | score | 返回 200，数据结构稳定 |
+| TC-CB-004 | pushup | 90 | date | 返回 200，数据结构稳定 |
+| TC-CB-005 | plank | 80 | date | 返回 200，数据结构稳定 |
+| TC-CB-006 | plank | 90 | score | 返回 200，数据结构稳定 |
 
 ### 3.6 TS-05：State Transition 状态转换（工具生成 5 条）
 
@@ -204,7 +187,7 @@ AutoTestDesign 工具根据输入的 FitnessAI 需求，自动选择以下 6 种
 | TC-ST-002 | ST[all-states] DESCENDING | 系统经过 DESCENDING 状态 |
 | TC-ST-003 | ST[all-states] DOWN | 系统经过 DOWN 状态 |
 | TC-ST-004 | ST[all-states] ASCENDING | 系统经过 ASCENDING 状态 |
-| TC-ST-005 | ST[all-states] COOLDOWN | 冷却期内第二次触发不计数 |
+| TC-ST-005 | reset → 初始状态 | `POST /api/analyzer/reset/squat` 后计数归零 |
 
 ### 3.7 TS-06：WhiteBox Java 白盒分析（工具生成 4 条）
 
@@ -234,9 +217,9 @@ AutoTestDesign 工具根据输入的 FitnessAI 需求，自动选择以下 6 种
 | EP-REQ-POSE-002-SC | state-machine short cycle — 非法短循环不计数 | REQ-POSE-002-SC | EP / DT / ST |
 | EP-REQ-REC-001 | record filtering — 无效记录过滤 (count<3 AND duration<30) | REQ-REC-001 | EP / BVA / DT / WBJ |
 | EP-REQ-REC-001-SAVE | record saving — 有效记录保存入库 | REQ-REC-001-SAVE | EP / BVA / DT / WBJ |
-| EP-REQ-PLAN-001 | training plan easy — 简单训练计划生成 | REQ-PLAN-001 | EP / DT / Pairwise |
-| EP-REQ-PLAN-001-MED | training plan medium — 中等训练计划生成 | REQ-PLAN-001-MED | EP / DT / Pairwise |
-| EP-REQ-PLAN-001-HARD | training plan hard — 困难训练计划生成 | REQ-PLAN-001-HARD | EP / DT / Pairwise |
+| EP-REQ-PLAN-001 | exercise list first-item difficulty — 第一项难度字段校验 | REQ-PLAN-001 | EP / DT |
+| EP-REQ-PLAN-001-MED | exercise list second-item difficulty — 第二项难度字段校验 | REQ-PLAN-001-MED | EP / DT |
+| EP-REQ-PLAN-001-HARD | exercise list third-item difficulty — 第三项难度字段校验 | REQ-PLAN-001-HARD | EP / DT |
 | EP-REQ-DASH-001 | dashboard calories — 卡路里计算 (MET×weight×duration) | REQ-DASH-001 | EP / BVA / DT |
 
 **第二类：测试技术覆盖项（5 项）**
@@ -244,10 +227,10 @@ AutoTestDesign 工具根据输入的 FitnessAI 需求，自动选择以下 6 种
 | 覆盖项 | 说明 |
 |-------|------|
 | EP（等价划分）| 对所有 10 条功能需求的有效/无效等价类进行划分，生成 20 条用例 |
-| BVA（边界值分析）| 对 landmarks.length / durationSeconds / count 三个边界参数三点取样，生成 30 条用例 |
-| DecisionTable（决策表）| 对记录过滤 4 规则组合 + exerciseType × landmarks 有效性组合，生成 16 条用例 |
-| Combinatorial（组合测试）| 对 difficulty × skipRest 2 参数进行 Pairwise 覆盖，生成 6 条用例 |
-| StateTransition（状态转换）| 对深蹲状态机 5 状态（UP / DESCENDING / DOWN / ASCENDING / COOLDOWN）全路径覆盖，生成 5 条用例 |
+| BVA（边界值分析）| 对 landmarks.length / durationSeconds / count 三个边界参数取样，生成 30 条用例 |
+| DecisionTable（决策表）| 对记录过滤 4 规则组合 + 运动列表难度字段校验，生成 16 条用例 |
+| Combinatorial（组合测试）| 对历史记录筛选参数 `exerciseType × minScore × sortBy` 做 Pairwise 覆盖，生成 6 条用例 |
+| StateTransition（状态转换）| 对深蹲主状态路径（UP / DESCENDING / DOWN / ASCENDING）及 reset 场景覆盖，生成 5 条用例 |
 
 **第三类：白盒覆盖项（22 项，`saveExerciseRecord` 方法 CFG 分析）**
 
@@ -291,10 +274,10 @@ AutoTestDesign 工具根据输入的 FitnessAI 需求，自动选择以下 6 种
 | TC-DT-007 | Decision Table | EP-REQ-REC-001-SAVE（F-T 组合）| REQ-REC-001-SAVE | RA-EXT-004 |
 | TC-DT-013 | Decision Table | EP-REQ-PLAN-001 | REQ-PLAN-001 | REQ-PLAN-001（Score 9）|
 | TC-DT-016 | Decision Table | EP-REQ-DASH-001 | REQ-DASH-001 | RA-EXT-005 / RA-EXT-006 |
-| TC-CB-001~006 | Pairwise | EP-REQ-PLAN-001/MED/HARD | REQ-PLAN-001/MED/HARD | REQ-PLAN-001（Score 9）|
+| TC-CB-001~006 | Pairwise | 历史记录筛选参数对覆盖 | REQ-REC-001-SAVE | REQ-REC-001-SAVE（Score 9）|
 | TC-ST-001 | State Transition | EP-REQ-POSE-002（UP 状态）| REQ-POSE-002 | RA-EXT-003（状态抖动）|
 | TC-ST-002~004 | State Transition | EP-REQ-POSE-002（中间状态）| REQ-POSE-002 | RA-EXT-003 |
-| TC-ST-005 | State Transition | EP-REQ-POSE-002（COOLDOWN）| REQ-POSE-002 | RA-EXT-003 |
+| TC-ST-005 | State Transition | 分析器 reset 后回到初始状态 | REQ-POSE-002 | RA-EXT-003 |
 | TC-WBJ-001 | WhiteBox Java | **COV-BR-001-T**（TRUE 分支）| REQ-REC-001 | RA-EXT-004（AND 分支覆盖）|
 | TC-WBJ-002 | WhiteBox Java | **COV-BR-001-F**（FALSE 分支）| REQ-REC-001-SAVE | RA-EXT-004 |
 | TC-WBJ-003 | WhiteBox Java | **COV-BR-002-T**（TRUE 分支，M-002）| REQ-REC-001 | RA-EXT-004 |
@@ -341,7 +324,7 @@ AutoTestDesign 工具根据输入的 FitnessAI 需求，自动选择以下 6 种
 - [x] Generated Results Summary 确认（81 条，7ms，meets 2s NFR）
 - [x] 导出 CSV 文件（`autotestdesign-*.csv`）
 - [x] 导出 JSON 文件（`autotestdesign-*.json`）
-- [x] JUnit5 + REST Assured 脚本开发（基于 81 条工具用例）
+- [x] JUnit5 + MockMvc 脚本开发（基于 81 条工具用例）
 - [x] 在 FitnessAI 上执行测试，记录结果
 
 **脚本开发阶段（待完成）**
@@ -352,50 +335,21 @@ AutoTestDesign 工具根据输入的 FitnessAI 需求，自动选择以下 6 种
 
 ## 5. 组织架构图
 
-```
-                    ┌─────────────────────┐
-                    │    项目负责人（PM）    │
-                    │  进度把控、与导师沟通   │
-                    └─────────┬───────────┘
-                              │
-              ┌───────────────┼───────────────┐
-              ▼               ▼               ▼
-   ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
-   │ 测试设计工程师 │  │ 测试执行工程师 │  │ 开发支持工程师 │
-   │              │  │              │  │（FitnessAI 开发）│
-   │ 职责：        │  │ 职责：        │  │              │
-   │ • 使用 Auto-  │  │ • 编写 JUnit5  │  │ • 提供被测环境 │
-   │   TestDesign  │  │   脚本（基于工 │  │ • 协助复现缺陷 │
-   │   工具生成用例 │  │   具导出用例）  │  │ • 修复确认缺陷 │
-   │ • 交互审查    │  │ • 执行手工安全 │  │              │
-   │   风险/覆盖项 │  │   和性能测试   │  │              │
-   │ • 维护追溯    │  │ • 缺陷记录    │  │              │
-   └──────────────┘  └──────────────┘  └──────────────┘
-```
+
+![测试组织架构图](./image/test_plan_org_chart.svg)
 
 **AutoTestDesign 工具在测试流程中的位置**：
 
-```
-测试设计工程师
-    1. 输入 FitnessAI 需求 → AutoTestDesign 工具
-    2. 工具运行 QRA → 生成风险矩阵（10 条）
-    3. 交互审查 → 修改风险 → Save Changes
-    4. 工具生成黑盒/白盒用例（81 条，7ms）
-    5. 导出 CSV/JSON/Excel
-                      ↓
-测试执行工程师
-    6. 基于导出用例 → 开发 JUnit5 测试脚本
-    7. 运行脚本对 FitnessAI 进行测试
-    8. 记录结果 → 测试结果分析报告
-```
+
+![AutoTestDesign 在测试流程中的位置](./image/test_plan_tool_workflow.svg)
 
 ---
 
 ## 6. 测试框架选择与理由
 
-### 6.1 后端 API 测试：JUnit 5 + REST Assured
+### 6.1 后端 API 测试：JUnit 5 + MockMvc
 
-| 评估维度 | JUnit 5 + REST Assured | Postman/Newman | PyTest + Requests |
+| 评估维度 | JUnit 5 + MockMvc | Postman/Newman | PyTest + Requests |
 |---------|----------------------|----------------|-----------------|
 | 与被测系统语言一致 | ✅ Java 项目，天然融合 | ❌ 需独立工具链 | ❌ 跨语言 |
 | Maven 集成 | ✅ `pom.xml` 已含 `spring-boot-starter-test` | 需 Newman CLI | 需 Python 环境 |
@@ -552,8 +506,8 @@ AutoTestDesign 工具根据输入的 FitnessAI 需求，自动选择以下 6 种
 ### 9.2 测试报告编译归档
 在根目录下自动创建归档文件夹，目录布局：
 ```text
-TestResult/yymmddhhmmss/
-├── yymmddhhmmss.txt        # 格式化控制台执行与通过率日志统计报告
+TestResult/<timestamp>/
+├── <timestamp>.txt         # 格式化控制台执行与通过率日志统计报告
 ├── index.html              # 编译渲染 Allure 报告网页
 ├── styles.css & app.js     # 离线静态网页资源文件
 ├── data/                   # 编译完毕的结构数据
@@ -564,9 +518,9 @@ TestResult/yymmddhhmmss/
 * **方式 1：利用本地 Allure 批处理工具**
   在项目根目录下打开终端，执行以下命令：
   ```powershell
-  .\.allure\allure-2.24.0\bin\allure.bat open TestResult\yymmddhhmmss
+  .\.allure\allure-2.24.0\bin\allure.bat open TestResult\<timestamp>
   ```
-  *(只需将 `yymmddhhmmss` 替换为最新生成的文件夹名字)*
+  *(只需将 `<timestamp>` 替换为最新生成的文件夹名字)*
   它会自动在本地开启 Jetty 服务（如 `http://localhost:54838`）并自动拉起默认浏览器，展现数据报告。查看完毕后在终端按 `Ctrl + C` 即可安全关闭。
 * **方式 2：使用 Python 快速托管**
   在对应的时间戳归档目录下打开终端，执行：

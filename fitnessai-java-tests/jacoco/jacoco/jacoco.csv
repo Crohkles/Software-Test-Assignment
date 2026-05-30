@@ -1,0 +1,26 @@
+GROUP,PACKAGE,CLASS,INSTRUCTION_MISSED,INSTRUCTION_COVERED,BRANCH_MISSED,BRANCH_COVERED,LINE_MISSED,LINE_COVERED,COMPLEXITY_MISSED,COMPLEXITY_COVERED,METHOD_MISSED,METHOD_COVERED
+FitnessAI Backend,com.fitnessai.analyzer,PoseAnalyzer,56,197,12,16,11,39,14,12,2,10
+FitnessAI Backend,com.fitnessai.analyzer,PlankAnalyzer.PlankAnalysisResult,15,0,0,0,6,0,1,0,1,0
+FitnessAI Backend,com.fitnessai.analyzer,PlankAnalyzer,722,0,92,0,124,0,55,0,9,0
+FitnessAI Backend,com.fitnessai.analyzer,PoseAnalyzerFactory,58,65,6,3,15,14,8,7,4,5
+FitnessAI Backend,com.fitnessai.analyzer,SquatAnalyzer,37,394,8,32,6,77,8,23,0,11
+FitnessAI Backend,com.fitnessai.analyzer,JumpingJackAnalyzer,210,357,53,21,51,71,39,9,2,9
+FitnessAI Backend,com.fitnessai.analyzer,PushupAnalyzer.PushupAnalysisResult,0,12,0,0,0,5,0,1,0,1
+FitnessAI Backend,com.fitnessai.analyzer,PushupAnalyzer,293,402,55,29,61,77,43,11,2,10
+FitnessAI Backend,com.fitnessai.analyzer,JumpingJackAnalyzer.JumpingJackAnalysisResult,0,15,0,0,0,6,0,1,0,1
+FitnessAI Backend,com.fitnessai.service,UserService,775,493,154,26,128,99,110,15,25,10
+FitnessAI Backend,com.fitnessai.config,DatabaseHealthIndicator,55,3,4,0,18,1,3,1,1,1
+FitnessAI Backend,com.fitnessai.config,CorsConfig,0,8,0,0,0,2,0,2,0,2
+FitnessAI Backend,com.fitnessai.config,CorsConfig.new WebMvcConfigurer() {...},0,52,0,0,0,8,0,2,0,2
+FitnessAI Backend,com.fitnessai,FitnessAiApplication,23,3,0,0,8,1,1,1,1,1
+FitnessAI Backend,com.fitnessai.model,ExerciseRecord,48,108,2,2,13,31,15,13,13,13
+FitnessAI Backend,com.fitnessai.model,DailyStats,52,119,0,0,15,25,15,6,15,6
+FitnessAI Backend,com.fitnessai.model,User,65,72,0,0,19,17,18,5,18,5
+FitnessAI Backend,com.fitnessai.model,PoseLandmark,30,64,1,1,2,21,2,11,1,11
+FitnessAI Backend,com.fitnessai.model,ExerciseType,3,74,0,4,1,14,1,6,1,4
+FitnessAI Backend,com.fitnessai.controller,MainController,168,7,6,0,30,2,11,2,8,2
+FitnessAI Backend,com.fitnessai.controller,ExerciseController,119,298,2,4,28,26,3,6,1,5
+FitnessAI Backend,com.fitnessai.controller,UserController,531,195,17,5,101,31,19,6,9,5
+FitnessAI Backend,com.fitnessai.controller,ExerciseController.ExerciseInfo,0,21,0,0,0,8,0,1,0,1
+FitnessAI Backend,com.fitnessai.dto,PoseAnalysisRequest,1,89,2,12,0,19,2,15,0,10
+FitnessAI Backend,com.fitnessai.dto,PoseAnalysisResponse,107,111,0,0,22,32,12,15,12,15

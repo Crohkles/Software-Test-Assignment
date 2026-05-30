@@ -1,0 +1,308 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PlankAnalyzer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">FitnessAI Backend</a> &gt; <a href="index.source.html" class="el_package">com.fitnessai.analyzer</a> &gt; <span class="el_source">PlankAnalyzer.java</span></div><h1>PlankAnalyzer.java</h1><pre class="source lang-java linenums">package com.fitnessai.analyzer;
+
+import com.fitnessai.model.PoseLandmark;
+import com.fitnessai.dto.PoseAnalysisResponse;
+import com.fitnessai.model.ExerciseType;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * 平板支撑动作分析器
+ *
+ * 基于身体直线度和肘部弯曲检测平板支撑动作
+ */
+public class PlankAnalyzer extends PoseAnalyzer {
+
+    // 平板支撑特定参数
+    private static final double ELBOW_ANGLE_THRESHOLD = 120.0; // 肘部弯曲角度阈值
+    private static final int MIN_STABLE_FRAMES = 10;           // 最小稳定帧数
+    private static final int MAX_UNSTABLE_FRAMES = 5;          // 最大不稳定帧数
+    private static final double QUALITY_THRESHOLD = 0.8;       // 姿势质量阈值
+    private static final double PLANK_MIN_CONFIDENCE = 0.2;    // 平板支撑的低可见性阈值
+
+    // 状态变量
+<span class="nc" id="L26">    private long plankStartTime = 0;       // 平板支撑开始时间戳（毫秒）</span>
+<span class="nc" id="L27">    private double accumulatedDuration = 0; // 累计持续时间（秒）</span>
+<span class="nc" id="L28">    private boolean isInPlank = false;</span>
+<span class="nc" id="L29">    private int stableFrames = 0;</span>
+<span class="nc" id="L30">    private int unstableFrames = 0;</span>
+
+    public PlankAnalyzer() {
+<span class="nc" id="L33">        super();</span>
+<span class="nc" id="L34">        logger.info(&quot;🧘 初始化平板支撑分析器&quot;);</span>
+<span class="nc" id="L35">    }</span>
+
+    @Override
+    public ExerciseType getExerciseType() {
+<span class="nc" id="L39">        return ExerciseType.PLANK;</span>
+    }
+
+    /**
+     * 平板支撑专用的可见性检查（使用更低的阈值）
+     */
+    private boolean isPlankPoseVisible(List&lt;PoseLandmark&gt; landmarks, int[] requiredLandmarks) {
+<span class="nc bnc" id="L46" title="All 4 branches missed.">        if (landmarks == null || landmarks.size() &lt; 33) {</span>
+<span class="nc" id="L47">            return false;</span>
+        }
+
+<span class="nc" id="L50">        int visibleCount = 0;</span>
+<span class="nc bnc" id="L51" title="All 2 branches missed.">        for (int idx : requiredLandmarks) {</span>
+<span class="nc bnc" id="L52" title="All 4 branches missed.">            if (idx &lt; landmarks.size() &amp;&amp; landmarks.get(idx).getVisibility() &gt;= PLANK_MIN_CONFIDENCE) {</span>
+<span class="nc" id="L53">                visibleCount++;</span>
+            }
+        }
+
+        // 只要有一半以上的关键点可见就可以
+<span class="nc bnc" id="L58" title="All 2 branches missed.">        return visibleCount &gt;= requiredLandmarks.length / 2;</span>
+    }
+
+    @Override
+    public PoseAnalysisResponse analyze(List&lt;PoseLandmark&gt; landmarks) {
+        // 使用更宽松的可见性检查
+<span class="nc bnc" id="L64" title="All 2 branches missed.">        if (!isPlankPoseVisible(landmarks, new int[]{11, 12, 13, 14})) { // 肩部和肘部</span>
+<span class="nc" id="L65">            return createBasicErrorResponse(&quot;请确保上半身在摄像头范围内&quot;, ExerciseType.PLANK);</span>
+        }
+
+        try {
+            // 检查平板支撑姿势
+<span class="nc" id="L70">            PlankAnalysisResult result = analyzePlankPosition(landmarks);</span>
+
+            // 更新状态
+<span class="nc" id="L73">            updatePlankState(result);</span>
+
+            // 计算持续时间（秒）- 使用真实时间戳
+<span class="nc" id="L76">            double durationSeconds = accumulatedDuration;</span>
+<span class="nc bnc" id="L77" title="All 4 branches missed.">            if (isInPlank &amp;&amp; plankStartTime &gt; 0) {</span>
+                // 如果当前正在平板支撑，加上从上次开始到现在的时间
+<span class="nc" id="L79">                durationSeconds += (System.currentTimeMillis() - plankStartTime) / 1000.0;</span>
+            }
+
+            // 生成反馈
+<span class="nc" id="L83">            String feedback = generateFeedback(result, durationSeconds);</span>
+
+            // 计算得分
+<span class="nc" id="L86">            int score = calculateScore(result);</span>
+
+            // 计算持续时间的整数秒数（用于前端显示）
+<span class="nc" id="L89">            int durationSecondsInt = (int) Math.round(durationSeconds);</span>
+
+            // 创建响应 - count 使用持续秒数
+<span class="nc" id="L92">            PoseAnalysisResponse response = PoseAnalysisResponse.success(</span>
+                true, score, feedback, durationSecondsInt, ExerciseType.PLANK, 0.9
+            );
+
+            // 添加详细信息
+<span class="nc" id="L97">            Map&lt;String, Object&gt; details = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L98">            details.put(&quot;elbow_angle&quot;, Math.round(result.avgElbowAngle * 10.0) / 10.0);</span>
+<span class="nc" id="L99">            details.put(&quot;elbows_under_shoulders&quot;, result.elbowsUnderShoulders);</span>
+<span class="nc" id="L100">            details.put(&quot;stable_frames&quot;, stableFrames);</span>
+<span class="nc" id="L101">            details.put(&quot;duration_seconds&quot;, Math.round(durationSeconds * 10.0) / 10.0);</span>
+<span class="nc" id="L102">            response.setDetails(details);</span>
+
+<span class="nc" id="L104">            response.setDuration(durationSeconds);</span>
+
+<span class="nc" id="L106">            logger.debug(&quot;平板支撑分析 - 时长: {:.1f}s, 正确: {}, 稳定帧: {}, 反馈: {}&quot;,</span>
+<span class="nc" id="L107">                        durationSeconds, result.isCorrect, stableFrames, feedback);</span>
+
+<span class="nc" id="L109">            return response;</span>
+
+<span class="nc" id="L111">        } catch (Exception e) {</span>
+<span class="nc" id="L112">            logger.error(&quot;平板支撑分析错误: {}&quot;, e.getMessage(), e);</span>
+<span class="nc" id="L113">            return createErrorResponse(&quot;分析失败: &quot; + e.getMessage(), ExerciseType.PLANK);</span>
+        }
+    }
+
+    @Override
+    public void reset() {
+<span class="nc" id="L119">        super.reset();</span>
+<span class="nc" id="L120">        plankStartTime = 0;</span>
+<span class="nc" id="L121">        accumulatedDuration = 0;</span>
+<span class="nc" id="L122">        isInPlank = false;</span>
+<span class="nc" id="L123">        stableFrames = 0;</span>
+<span class="nc" id="L124">        unstableFrames = 0;</span>
+<span class="nc" id="L125">        logger.info(&quot;🔄 重置平板支撑分析器&quot;);</span>
+<span class="nc" id="L126">    }</span>
+
+    /**
+     * 分析平板支撑姿势（支持正面和侧面视角）
+     */
+    private PlankAnalysisResult analyzePlankPosition(List&lt;PoseLandmark&gt; landmarks) {
+<span class="nc" id="L132">        PoseLandmark leftShoulder = landmarks.get(11);</span>
+<span class="nc" id="L133">        PoseLandmark rightShoulder = landmarks.get(12);</span>
+<span class="nc" id="L134">        PoseLandmark leftElbow = landmarks.get(13);</span>
+<span class="nc" id="L135">        PoseLandmark rightElbow = landmarks.get(14);</span>
+<span class="nc" id="L136">        PoseLandmark leftHip = landmarks.get(23);</span>
+<span class="nc" id="L137">        PoseLandmark rightHip = landmarks.get(24);</span>
+<span class="nc" id="L138">        PoseLandmark leftAnkle = landmarks.get(27);</span>
+<span class="nc" id="L139">        PoseLandmark rightAnkle = landmarks.get(28);</span>
+
+        // 判断视角：通过左右肩的X坐标差异来判断
+        // 侧面视角时，两肩的X坐标接近；正面视角时，两肩的X坐标差异较大
+<span class="nc" id="L143">        double shoulderWidthX = Math.abs(leftShoulder.getX() - rightShoulder.getX());</span>
+<span class="nc bnc" id="L144" title="All 2 branches missed.">        boolean isSideView = shoulderWidthX &lt; 0.15; // 阈值，小于0.15认为是侧面视角</span>
+
+<span class="nc" id="L146">        logger.debug(&quot;视角检测 - 肩宽差: {:.3f}, 侧面视角: {}&quot;, shoulderWidthX, isSideView);</span>
+
+<span class="nc bnc" id="L148" title="All 2 branches missed.">        if (isSideView) {</span>
+            // ====== 侧面视角分析 ======
+            // 使用可见性更高的一侧进行分析
+<span class="nc bnc" id="L151" title="All 2 branches missed.">            boolean useLeft = leftShoulder.getVisibility() &gt; rightShoulder.getVisibility();</span>
+            
+<span class="nc bnc" id="L153" title="All 2 branches missed.">            PoseLandmark shoulder = useLeft ? leftShoulder : rightShoulder;</span>
+<span class="nc bnc" id="L154" title="All 2 branches missed.">            PoseLandmark hip = useLeft ? leftHip : rightHip;</span>
+<span class="nc bnc" id="L155" title="All 2 branches missed.">            PoseLandmark ankle = useLeft ? leftAnkle : rightAnkle;</span>
+<span class="nc bnc" id="L156" title="All 2 branches missed.">            PoseLandmark elbow = useLeft ? leftElbow : rightElbow;</span>
+
+            // 检查身体是否成一条直线：计算肩-髋-踝的角度
+            // 理想情况下应该接近180度（一条直线）
+<span class="nc" id="L160">            double bodyLineAngle = calculateAngle(shoulder, hip, ankle);</span>
+<span class="nc bnc" id="L161" title="All 4 branches missed.">            boolean isBodyStraight = bodyLineAngle &gt; 150.0 &amp;&amp; bodyLineAngle &lt; 200.0;</span>
+
+            // 检查是否处于支撑姿势（肩部高度高于髋部，髋部高于脚踝 - 水平姿势）
+            // 注意：Y坐标在图像中向下增加，所以这里的比较可能需要调整
+<span class="nc bnc" id="L165" title="All 2 branches missed.">            boolean isHorizontal = Math.abs(shoulder.getY() - ankle.getY()) &lt; 0.3; // 肩和脚踝大致水平</span>
+
+            // 检查肘部是否弯曲（用于前臂支撑式平板）
+<span class="nc bnc" id="L168" title="All 2 branches missed.">            boolean elbowBent = elbow.getY() &gt; shoulder.getY(); // 肘部低于肩部</span>
+
+            // 侧面视角的正确姿势判定
+<span class="nc bnc" id="L171" title="All 6 branches missed.">            boolean isCorrect = isBodyStraight &amp;&amp; (isHorizontal || elbowBent);</span>
+
+<span class="nc" id="L173">            logger.debug(&quot;侧面视角分析 - 身体直线角度: {:.1f}, 身体挺直: {}, 水平: {}, 姿势正确: {}&quot;,</span>
+<span class="nc" id="L174">                        bodyLineAngle, isBodyStraight, isHorizontal, isCorrect);</span>
+
+<span class="nc" id="L176">            return new PlankAnalysisResult(isCorrect, bodyLineAngle, isBodyStraight, isSideView);</span>
+        } else {
+            // ====== 正面视角分析（保持原逻辑） ======
+            // 检查肘部是否弯曲（创建虚拟的手腕点来计算角度）
+<span class="nc" id="L180">            PoseLandmark leftVirtualWrist = new PoseLandmark(</span>
+<span class="nc" id="L181">                leftElbow.getX(), leftElbow.getY() + 0.1, leftElbow.getZ(), 1.0</span>
+            );
+<span class="nc" id="L183">            PoseLandmark rightVirtualWrist = new PoseLandmark(</span>
+<span class="nc" id="L184">                rightElbow.getX(), rightElbow.getY() + 0.1, rightElbow.getZ(), 1.0</span>
+            );
+
+<span class="nc" id="L187">            double leftElbowAngle = calculateAngle(leftShoulder, leftElbow, leftVirtualWrist);</span>
+<span class="nc" id="L188">            double rightElbowAngle = calculateAngle(rightShoulder, rightElbow, rightVirtualWrist);</span>
+<span class="nc" id="L189">            double avgElbowAngle = (leftElbowAngle + rightElbowAngle) / 2.0;</span>
+
+            // 检查肘部是否在肩部下方
+<span class="nc bnc" id="L192" title="All 2 branches missed.">            boolean elbowsUnderShoulders = (leftElbow.getY() &gt; leftShoulder.getY() &amp;&amp;</span>
+<span class="nc bnc" id="L193" title="All 2 branches missed.">                                           rightElbow.getY() &gt; rightShoulder.getY());</span>
+
+            // 判断姿势是否正确
+<span class="nc bnc" id="L196" title="All 4 branches missed.">            boolean isCorrect = avgElbowAngle &lt; ELBOW_ANGLE_THRESHOLD &amp;&amp; elbowsUnderShoulders;</span>
+
+<span class="nc" id="L198">            return new PlankAnalysisResult(isCorrect, avgElbowAngle, elbowsUnderShoulders, isSideView);</span>
+        }
+    }
+
+    /**
+     * 更新平板支撑状态
+     */
+    private void updatePlankState(PlankAnalysisResult result) {
+<span class="nc bnc" id="L206" title="All 2 branches missed.">        if (result.isCorrect) {</span>
+<span class="nc" id="L207">            stableFrames++;</span>
+<span class="nc" id="L208">            unstableFrames = 0;</span>
+
+<span class="nc bnc" id="L210" title="All 2 branches missed.">            if (stableFrames &gt;= MIN_STABLE_FRAMES) {</span>
+<span class="nc bnc" id="L211" title="All 2 branches missed.">                if (!isInPlank) {</span>
+<span class="nc" id="L212">                    isInPlank = true;</span>
+<span class="nc" id="L213">                    plankStartTime = System.currentTimeMillis(); // 记录开始时间</span>
+<span class="nc" id="L214">                    logger.info(&quot;🧘 开始平板支撑计时&quot;);</span>
+                }
+                // 不再使用帧计数，时间在 analyze 方法中实时计算
+            }
+        } else {
+<span class="nc" id="L219">            unstableFrames++;</span>
+
+            // 如果不稳定帧数超过阈值，减少稳定帧数
+<span class="nc bnc" id="L222" title="All 2 branches missed.">            if (unstableFrames &gt; MAX_UNSTABLE_FRAMES) {</span>
+<span class="nc bnc" id="L223" title="All 2 branches missed.">                if (stableFrames &gt; 0) {</span>
+<span class="nc" id="L224">                    stableFrames--;</span>
+                }
+
+                // 如果稳定帧数降至阈值以下，停止计时
+<span class="nc bnc" id="L228" title="All 2 branches missed.">                if (stableFrames &lt; MIN_STABLE_FRAMES / 3) {</span>
+<span class="nc bnc" id="L229" title="All 2 branches missed.">                    if (isInPlank) {</span>
+                        // 累加这段时间的持续时间
+<span class="nc bnc" id="L231" title="All 2 branches missed.">                        if (plankStartTime &gt; 0) {</span>
+<span class="nc" id="L232">                            accumulatedDuration += (System.currentTimeMillis() - plankStartTime) / 1000.0;</span>
+<span class="nc" id="L233">                            plankStartTime = 0;</span>
+                        }
+<span class="nc" id="L235">                        logger.info(&quot;⏹️ 停止平板支撑计时，累计: {:.1f}秒&quot;, accumulatedDuration);</span>
+<span class="nc" id="L236">                        isInPlank = false;</span>
+                    }
+                }
+            }
+        }
+<span class="nc" id="L241">    }</span>
+
+    /**
+     * 生成反馈
+     */
+    private String generateFeedback(PlankAnalysisResult result, double durationSeconds) {
+<span class="nc bnc" id="L247" title="All 2 branches missed.">        if (!result.isCorrect) {</span>
+<span class="nc" id="L248">            StringBuilder feedback = new StringBuilder();</span>
+            
+<span class="nc bnc" id="L250" title="All 2 branches missed.">            if (result.isSideView) {</span>
+                // 侧面视角的反馈
+<span class="nc bnc" id="L252" title="All 2 branches missed.">                if (!result.elbowsUnderShoulders) { // 这里 elbowsUnderShoulders 在侧面视角下表示 isBodyStraight</span>
+<span class="nc" id="L253">                    feedback.append(&quot;请保持身体成一条直线，不要弯腰或塌腰&quot;);</span>
+                } else {
+<span class="nc" id="L255">                    feedback.append(&quot;调整姿势，保持从头到脚呈直线&quot;);</span>
+                }
+            } else {
+                // 正面视角的反馈
+<span class="nc bnc" id="L259" title="All 2 branches missed.">                if (result.avgElbowAngle &gt;= ELBOW_ANGLE_THRESHOLD) {</span>
+<span class="nc" id="L260">                    feedback.append(&quot;手肘需要弯曲&quot;);</span>
+                }
+<span class="nc bnc" id="L262" title="All 2 branches missed.">                if (!result.elbowsUnderShoulders) {</span>
+<span class="nc bnc" id="L263" title="All 2 branches missed.">                    if (feedback.length() &gt; 0) feedback.append(&quot;，&quot;);</span>
+<span class="nc" id="L264">                    feedback.append(&quot;肘部应在肩部下方&quot;);</span>
+                }
+            }
+<span class="nc bnc" id="L267" title="All 2 branches missed.">            return feedback.length() &gt; 0 ? feedback.toString() : &quot;调整姿势&quot;;</span>
+        }
+
+        // 正确姿势反馈
+<span class="nc bnc" id="L271" title="All 2 branches missed.">        if (stableFrames &lt; MIN_STABLE_FRAMES) {</span>
+<span class="nc" id="L272">            return String.format(&quot;保持姿势稳定，还需 %d 帧&quot;, MIN_STABLE_FRAMES - stableFrames);</span>
+        }
+
+<span class="nc bnc" id="L275" title="All 2 branches missed.">        if (durationSeconds &lt; 10) {</span>
+<span class="nc" id="L276">            return String.format(&quot;姿势正确，已坚持 %.1f 秒&quot;, durationSeconds);</span>
+<span class="nc bnc" id="L277" title="All 2 branches missed.">        } else if (durationSeconds &lt; 30) {</span>
+<span class="nc" id="L278">            return String.format(&quot;做得好！已坚持 %.1f 秒&quot;, durationSeconds);</span>
+        } else {
+<span class="nc" id="L280">            return String.format(&quot;太棒了！已坚持 %.1f 秒&quot;, durationSeconds);</span>
+        }
+    }
+
+    /**
+     * 计算得分
+     */
+    private int calculateScore(PlankAnalysisResult result) {
+<span class="nc bnc" id="L288" title="All 2 branches missed.">        return result.isCorrect ? 80 : 60;</span>
+    }
+
+    /**
+     * 平板支撑分析结果内部类
+     */
+    private static class PlankAnalysisResult {
+        boolean isCorrect;
+        double avgElbowAngle;     // 正面视角：肘部角度；侧面视角：身体直线角度
+        boolean elbowsUnderShoulders; // 正面视角：肘部在肩下；侧面视角：身体是否挺直
+        boolean isSideView;       // 是否为侧面视角
+
+<span class="nc" id="L300">        PlankAnalysisResult(boolean isCorrect, double avgElbowAngle, boolean elbowsUnderShoulders, boolean isSideView) {</span>
+<span class="nc" id="L301">            this.isCorrect = isCorrect;</span>
+<span class="nc" id="L302">            this.avgElbowAngle = avgElbowAngle;</span>
+<span class="nc" id="L303">            this.elbowsUnderShoulders = elbowsUnderShoulders;</span>
+<span class="nc" id="L304">            this.isSideView = isSideView;</span>
+<span class="nc" id="L305">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>
