@@ -1,0 +1,215 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SquatAnalyzer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">FitnessAI Backend</a> &gt; <a href="index.source.html" class="el_package">com.fitnessai.analyzer</a> &gt; <span class="el_source">SquatAnalyzer.java</span></div><h1>SquatAnalyzer.java</h1><pre class="source lang-java linenums">package com.fitnessai.analyzer;
+
+import com.fitnessai.model.PoseLandmark;
+import com.fitnessai.dto.PoseAnalysisResponse;
+import com.fitnessai.model.ExerciseType;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * 深蹲动作分析器
+ *
+ * 基于膝盖角度检测深蹲动作并进行计数
+ */
+public class SquatAnalyzer extends PoseAnalyzer {
+
+    // 深蹲特定参数
+    private static final double ANGLE_THRESHOLD = 140.0;    // 下蹲角度阈值
+    private static final double STANDING_THRESHOLD = 140.0; // 站立角度阈值
+    private static final int REQUIRED_FRAMES = 2;            // 确认状态所需帧数
+
+    // 状态变量
+<span class="fc" id="L24">    private int squatCount = 0;</span>
+<span class="fc" id="L25">    private boolean inSquatPosition = false;</span>
+<span class="fc" id="L26">    private int consecutiveUpFrames = 0;</span>
+<span class="fc" id="L27">    private int consecutiveDownFrames = 0;</span>
+
+    public SquatAnalyzer() {
+<span class="fc" id="L30">        super();</span>
+<span class="fc" id="L31">        logger.info(&quot;🏋️‍♀️ 初始化深蹲分析器&quot;);</span>
+<span class="fc" id="L32">    }</span>
+
+    @Override
+    public ExerciseType getExerciseType() {
+<span class="fc" id="L36">        return ExerciseType.SQUAT;</span>
+    }
+
+    @Override
+    public PoseAnalysisResponse analyze(List&lt;PoseLandmark&gt; landmarks) {
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">        if (!isPoseVisible(landmarks, new int[]{23, 24, 25, 26})) { // 髋部和膝盖</span>
+<span class="nc" id="L42">            return createBasicErrorResponse(&quot;请确保下半身在摄像头范围内&quot;, ExerciseType.SQUAT);</span>
+        }
+
+        try {
+            // 计算膝盖角度
+<span class="fc" id="L47">            double kneeAngle = calculateKneeAngle(landmarks);</span>
+
+            // 确定当前状态
+<span class="fc" id="L50">            String currentState = detectSquatState(kneeAngle);</span>
+
+            // 更新连续帧计数
+<span class="fc" id="L53">            updateFrameCounters(currentState);</span>
+
+            // 确认状态
+<span class="fc" id="L56">            String confirmedState = confirmState();</span>
+
+            // 更新计数
+<span class="fc" id="L59">            boolean countUpdated = updateCount(confirmedState);</span>
+
+            // 生成反馈
+<span class="fc" id="L62">            String feedback = generateFeedback(confirmedState);</span>
+
+            // 计算得分
+<span class="fc" id="L65">            int score = calculateScore(confirmedState, kneeAngle);</span>
+
+            // 计算准确率
+<span class="fc bfc" id="L68" title="All 2 branches covered.">            double accuracy = calculateAccuracy(squatCount + (countUpdated ? 1 : 0), squatCount);</span>
+
+            // 创建响应
+<span class="fc" id="L71">            PoseAnalysisResponse response = PoseAnalysisResponse.success(</span>
+                true, (int)score, feedback, squatCount, ExerciseType.SQUAT, accuracy
+            );
+
+            // 添加详细信息
+<span class="fc" id="L76">            Map&lt;String, Object&gt; details = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L77">            details.put(&quot;knee_angle&quot;, Math.round(kneeAngle * 10.0) / 10.0);</span>
+<span class="fc" id="L78">            details.put(&quot;state&quot;, confirmedState);</span>
+<span class="fc" id="L79">            details.put(&quot;cooldown&quot;, cooldownCounter);</span>
+<span class="fc" id="L80">            response.setDetails(details);</span>
+
+<span class="fc" id="L82">            logger.debug(&quot;深蹲分析 - 角度: {:.1f}, 状态: {}, 计数: {}, 反馈: {}&quot;,</span>
+<span class="fc" id="L83">                        kneeAngle, confirmedState, squatCount, feedback);</span>
+
+<span class="fc" id="L85">            return response;</span>
+
+<span class="nc" id="L87">        } catch (Exception e) {</span>
+<span class="nc" id="L88">            logger.error(&quot;深蹲分析错误: {}&quot;, e.getMessage(), e);</span>
+<span class="nc" id="L89">            return createErrorResponse(&quot;分析失败: &quot; + e.getMessage(), ExerciseType.SQUAT);</span>
+        }
+    }
+
+    @Override
+    public void reset() {
+<span class="fc" id="L95">        super.reset();</span>
+<span class="fc" id="L96">        squatCount = 0;</span>
+<span class="fc" id="L97">        inSquatPosition = false;</span>
+<span class="fc" id="L98">        consecutiveUpFrames = 0;</span>
+<span class="fc" id="L99">        consecutiveDownFrames = 0;</span>
+<span class="fc" id="L100">        logger.info(&quot;🔄 重置深蹲分析器 - 计数: {}&quot;, squatCount);</span>
+<span class="fc" id="L101">    }</span>
+
+    /**
+     * 计算膝盖角度
+     */
+    private double calculateKneeAngle(List&lt;PoseLandmark&gt; landmarks) {
+        // 使用可见性更好的一侧
+<span class="fc" id="L108">        double leftVisibility = landmarks.get(23).getVisibility() + landmarks.get(25).getVisibility() + landmarks.get(27).getVisibility();</span>
+<span class="fc" id="L109">        double rightVisibility = landmarks.get(24).getVisibility() + landmarks.get(26).getVisibility() + landmarks.get(28).getVisibility();</span>
+
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">        if (leftVisibility &gt; rightVisibility) {</span>
+            // 使用左侧
+<span class="nc" id="L113">            return calculateAngle(landmarks.get(23), landmarks.get(25), landmarks.get(27));</span>
+        } else {
+            // 使用右侧
+<span class="fc" id="L116">            return calculateAngle(landmarks.get(24), landmarks.get(26), landmarks.get(28));</span>
+        }
+    }
+
+    /**
+     * 检测深蹲状态
+     */
+    private String detectSquatState(double kneeAngle) {
+<span class="fc bfc" id="L124" title="All 2 branches covered.">        if (kneeAngle &lt; ANGLE_THRESHOLD) {</span>
+<span class="fc" id="L125">            return &quot;down&quot;;</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">        } else if (kneeAngle &gt; STANDING_THRESHOLD) {</span>
+<span class="fc" id="L127">            return &quot;up&quot;;</span>
+        } else {
+            // 在过渡区域，保持上一个状态，防止抖动
+<span class="fc" id="L130">            return lastState;</span>
+        }
+    }
+
+    /**
+     * 更新帧计数器
+     */
+    private void updateFrameCounters(String currentState) {
+<span class="fc bfc" id="L138" title="All 2 branches covered.">        if (currentState.equals(&quot;up&quot;)) {</span>
+<span class="fc" id="L139">            consecutiveUpFrames++;</span>
+<span class="fc" id="L140">            consecutiveDownFrames = 0;</span>
+<span class="fc bfc" id="L141" title="All 2 branches covered.">        } else if (currentState.equals(&quot;down&quot;)) {</span>
+<span class="fc" id="L142">            consecutiveDownFrames++;</span>
+<span class="fc" id="L143">            consecutiveUpFrames = 0;</span>
+        }
+<span class="fc" id="L145">    }</span>
+
+    /**
+     * 确认状态
+     */
+    private String confirmState() {
+<span class="fc bfc" id="L151" title="All 2 branches covered.">        if (consecutiveUpFrames &gt;= REQUIRED_FRAMES) {</span>
+<span class="fc" id="L152">            return &quot;up&quot;;</span>
+<span class="fc bfc" id="L153" title="All 2 branches covered.">        } else if (consecutiveDownFrames &gt;= REQUIRED_FRAMES) {</span>
+<span class="fc" id="L154">            return &quot;down&quot;;</span>
+        }
+<span class="fc" id="L156">        return lastState;</span>
+    }
+
+    /**
+     * 更新计数
+     */
+    private boolean updateCount(String currentState) {
+<span class="fc" id="L163">        updateCooldown();</span>
+
+<span class="fc bfc" id="L165" title="All 2 branches covered.">        if (currentState != lastState) {</span>
+<span class="fc bfc" id="L166" title="All 2 branches covered.">            if (stateChangedFrames &gt;= REQUIRED_FRAMES) {</span>
+<span class="pc bpc" id="L167" title="2 of 6 branches missed.">                if (!lastState.equals(&quot;down&quot;) &amp;&amp; currentState.equals(&quot;down&quot;) &amp;&amp; !isCooldownActive()) {</span>
+<span class="fc" id="L168">                    inSquatPosition = true;</span>
+<span class="fc" id="L169">                    logger.debug(&quot;👇 检测到下蹲&quot;);</span>
+<span class="pc bpc" id="L170" title="3 of 6 branches missed.">                } else if (lastState.equals(&quot;down&quot;) &amp;&amp; currentState.equals(&quot;up&quot;) &amp;&amp; inSquatPosition) {</span>
+<span class="pc bpc" id="L171" title="1 of 2 branches missed.">                    if (!isCooldownActive()) {</span>
+<span class="fc" id="L172">                        squatCount++;</span>
+<span class="fc" id="L173">                        startCooldown();</span>
+<span class="fc" id="L174">                        logger.info(&quot;✅ 深蹲计数增加: {}&quot;, squatCount);</span>
+<span class="fc" id="L175">                        return true;</span>
+                    }
+<span class="nc" id="L177">                    inSquatPosition = false;</span>
+                }
+<span class="fc" id="L179">                stateChangedFrames = 0;</span>
+            } else {
+<span class="fc" id="L181">                logger.debug(&quot;🔄 深蹲状态变化不稳定: {} -&gt; {}&quot;, lastState, currentState);</span>
+            }
+        } else {
+<span class="fc" id="L184">            stateChangedFrames++;</span>
+        }
+
+<span class="fc" id="L187">        lastState = currentState;</span>
+<span class="fc" id="L188">        return false;</span>
+    }
+
+    /**
+     * 生成反馈
+     */
+    private String generateFeedback(String confirmedState) {
+<span class="fc bfc" id="L195" title="All 2 branches covered.">        if (confirmedState.equals(&quot;down&quot;)) {</span>
+<span class="fc" id="L196">            return &quot;很好！下蹲姿势正确，请站起来完成动作&quot;;</span>
+        } else {
+<span class="fc" id="L198">            return &quot;站立姿势正确，请尝试下蹲&quot;;</span>
+        }
+    }
+
+    /**
+     * 计算得分
+     */
+    private int calculateScore(String confirmedState, double kneeAngle) {
+<span class="fc bfc" id="L206" title="All 2 branches covered.">        if (confirmedState.equals(&quot;down&quot;)) {</span>
+            // 下蹲越深，得分越高，但基础分更高
+<span class="fc" id="L208">            return (int)Math.max(70, 100 - Math.max(0, kneeAngle - 90));</span>
+        } else {
+            // 站得越直，得分越高，但基础分更高
+<span class="fc" id="L211">            return (int)Math.min(100, Math.max(70, kneeAngle));</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

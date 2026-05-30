@@ -1,0 +1,484 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UserService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">FitnessAI Backend</a> &gt; <a href="index.source.html" class="el_package">com.fitnessai.service</a> &gt; <span class="el_source">UserService.java</span></div><h1>UserService.java</h1><pre class="source lang-java linenums">package com.fitnessai.service;
+
+import com.fitnessai.model.*;
+import com.fitnessai.repository.*;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.*;
+import java.util.stream.Collectors;
+
+/**
+ * 用户服务类
+ */
+@Service
+@Transactional
+<span class="fc" id="L20">public class UserService {</span>
+    
+    @Autowired
+    private UserRepository userRepository;
+    
+    @Autowired
+    private ExerciseRecordRepository exerciseRecordRepository;
+    
+    @Autowired
+    private DailyStatsRepository dailyStatsRepository;
+    
+    /**
+     * 获取或创建用户
+     */
+    public User getOrCreateUser(String userId) {
+<span class="fc" id="L35">        return userRepository.findByUserId(userId)</span>
+<span class="fc" id="L36">                .orElseGet(() -&gt; {</span>
+<span class="fc" id="L37">                    User newUser = new User(userId);</span>
+<span class="fc" id="L38">                    return userRepository.save(newUser);</span>
+                });
+    }
+    
+    /**
+     * 更新用户资料
+     */
+    public User updateUserProfile(String userId, String name, Integer age, Integer height, Integer weight, String goal, String avatar) {
+<span class="nc" id="L46">        User user = getOrCreateUser(userId);</span>
+<span class="nc bnc" id="L47" title="All 2 branches missed.">        if (name != null) user.setName(name);</span>
+<span class="nc bnc" id="L48" title="All 2 branches missed.">        if (age != null) user.setAge(age);</span>
+<span class="nc bnc" id="L49" title="All 2 branches missed.">        if (height != null) user.setHeight(height);</span>
+<span class="nc bnc" id="L50" title="All 2 branches missed.">        if (weight != null) user.setWeight(weight);</span>
+<span class="nc bnc" id="L51" title="All 2 branches missed.">        if (goal != null) user.setGoal(goal);</span>
+<span class="nc bnc" id="L52" title="All 2 branches missed.">        if (avatar != null) user.setAvatar(avatar);</span>
+<span class="nc" id="L53">        return userRepository.save(user);</span>
+    }
+    
+    /**
+     * 保存运动记录
+     * 过滤无效记录：count &lt; 3 且 duration &lt; 30 的记录不保存
+     * @return 保存的记录，如果记录无效则返回null
+     */
+    public ExerciseRecord saveExerciseRecord(String userId, String exerciseType, int count, int duration, int score, double accuracy) {
+        // 确保用户存在
+<span class="fc" id="L63">        getOrCreateUser(userId);</span>
+        
+        // 过滤无效记录：count &lt; 3 且 duration &lt; 30 的记录不保存到数据库
+<span class="fc bfc" id="L66" title="All 4 branches covered.">        if (count &lt; 3 &amp;&amp; duration &lt; 30) {</span>
+            // 记录被过滤，不保存到数据库，返回null
+<span class="fc" id="L68">            return null;</span>
+        }
+        
+        // 创建记录
+<span class="fc" id="L72">        ExerciseRecord record = new ExerciseRecord(userId, exerciseType, count, duration);</span>
+<span class="fc" id="L73">        record.setScore(score);</span>
+<span class="fc" id="L74">        record.setAccuracy(accuracy);</span>
+        
+<span class="fc" id="L76">        ExerciseRecord savedRecord = exerciseRecordRepository.save(record);</span>
+        
+        // 更新每日统计
+<span class="fc" id="L79">        updateDailyStats(userId, exerciseType, count, duration, accuracy);</span>
+        
+<span class="fc" id="L81">        return savedRecord;</span>
+    }
+    
+    /**
+     * 更新每日统计
+     */
+    private void updateDailyStats(String userId, String exerciseType, int count, int duration, double accuracy) {
+<span class="fc" id="L88">        ZoneId beijingZone = ZoneId.of(&quot;Asia/Shanghai&quot;);</span>
+<span class="fc" id="L89">        LocalDate today = LocalDate.now(beijingZone);</span>
+        
+<span class="fc" id="L91">        DailyStats stats = dailyStatsRepository.findByUserIdAndStatDateAndExerciseType(userId, today, exerciseType)</span>
+<span class="fc" id="L92">                .orElseGet(() -&gt; {</span>
+<span class="fc" id="L93">                    DailyStats newStats = new DailyStats(userId, exerciseType);</span>
+<span class="fc" id="L94">                    newStats.setStatDate(today);</span>
+<span class="fc" id="L95">                    return newStats;</span>
+                });
+        
+<span class="fc" id="L98">        stats.addRecord(count, duration, accuracy);</span>
+        
+        // 计算并更新卡路里
+<span class="fc" id="L101">        User user = getOrCreateUser(userId);</span>
+<span class="fc" id="L102">        int calories = calculateCalories(exerciseType, duration, user.getWeight());</span>
+<span class="fc" id="L103">        stats.setTotalCalories(stats.getTotalCalories() + calories);</span>
+        
+<span class="fc" id="L105">        dailyStatsRepository.save(stats);</span>
+<span class="fc" id="L106">    }</span>
+    
+    /**
+     * 计算卡路里消耗
+     * 使用MET (Metabolic Equivalent of Task) 值
+     * 公式: Calories = MET × weight(kg) × duration(hours)
+     */
+    private int calculateCalories(String exerciseType, int durationSeconds, Integer weight) {
+<span class="pc bpc" id="L114" title="2 of 4 branches missed.">        if (weight == null || weight &lt;= 0) {</span>
+<span class="nc" id="L115">            weight = 65; // 默认体重</span>
+        }
+        
+        // MET值定义（每小时的代谢当量）
+<span class="fc" id="L119">        Map&lt;String, Double&gt; metValues = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L120">        metValues.put(&quot;squat&quot;, 5.0);</span>
+<span class="fc" id="L121">        metValues.put(&quot;pushup&quot;, 8.0);</span>
+<span class="fc" id="L122">        metValues.put(&quot;plank&quot;, 3.0);</span>
+<span class="fc" id="L123">        metValues.put(&quot;jumping_jack&quot;, 8.0);</span>
+        
+<span class="fc" id="L125">        Double met = metValues.getOrDefault(exerciseType.toLowerCase(), 5.0);</span>
+<span class="fc" id="L126">        double durationHours = durationSeconds / 3600.0;</span>
+        
+        // 计算卡路里（四舍五入到整数）
+<span class="fc" id="L129">        return (int) Math.round(met * weight * durationHours);</span>
+    }
+    
+    /**
+     * 获取用户历史记录
+     */
+    public List&lt;ExerciseRecord&gt; getHistoryRecords(String userId) {
+<span class="fc" id="L136">        return exerciseRecordRepository.findByUserIdOrderByRecordedAtDesc(userId);</span>
+    }
+    
+    /**
+     * 获取筛选和排序后的历史记录
+     */
+    public List&lt;ExerciseRecord&gt; getFilteredHistoryRecords(
+            String userId,
+            String exerciseType,
+            Integer minScore,
+            Integer maxScore,
+            Double minAccuracy,
+            Double maxAccuracy,
+            String sortBy) {
+        
+        // 先获取筛选后的记录
+<span class="fc" id="L152">        List&lt;ExerciseRecord&gt; records = exerciseRecordRepository.findFiltered(</span>
+                userId,
+                exerciseType,
+                minScore,
+                maxScore,
+                minAccuracy,
+                maxAccuracy
+        );
+        
+        // 在内存中排序（使用 null-safe 比较器，避免 NullPointerException）
+<span class="pc bpc" id="L162" title="2 of 6 branches missed.">        if (sortBy == null || sortBy.isEmpty() || sortBy.equals(&quot;date&quot;)) {</span>
+            // 按日期降序，如果日期相同则按时间戳降序（最新的在前）
+<span class="fc" id="L164">            records.sort((a, b) -&gt; {</span>
+<span class="nc" id="L165">                LocalDate dateA = a.getRecordDate();</span>
+<span class="nc" id="L166">                LocalDate dateB = b.getRecordDate();</span>
+<span class="nc" id="L167">                LocalDateTime timeA = a.getRecordedAt();</span>
+<span class="nc" id="L168">                LocalDateTime timeB = b.getRecordedAt();</span>
+                
+                // 处理 null 值
+<span class="nc bnc" id="L171" title="All 4 branches missed.">                if (dateA == null &amp;&amp; dateB == null) {</span>
+                    // 如果日期都为null，按时间戳排序
+<span class="nc bnc" id="L173" title="All 4 branches missed.">                    if (timeA == null &amp;&amp; timeB == null) return 0;</span>
+<span class="nc bnc" id="L174" title="All 2 branches missed.">                    if (timeA == null) return 1;</span>
+<span class="nc bnc" id="L175" title="All 2 branches missed.">                    if (timeB == null) return -1;</span>
+<span class="nc" id="L176">                    return timeB.compareTo(timeA);  // 降序</span>
+                }
+<span class="nc bnc" id="L178" title="All 2 branches missed.">                if (dateA == null) return 1;  // null 排在后面</span>
+<span class="nc bnc" id="L179" title="All 2 branches missed.">                if (dateB == null) return -1;  // null 排在后面</span>
+                
+                // 先按日期比较
+<span class="nc" id="L182">                int dateCompare = dateB.compareTo(dateA);  // 降序</span>
+<span class="nc bnc" id="L183" title="All 2 branches missed.">                if (dateCompare != 0) {</span>
+<span class="nc" id="L184">                    return dateCompare;</span>
+                }
+                
+                // 日期相同，按时间戳排序
+<span class="nc bnc" id="L188" title="All 4 branches missed.">                if (timeA == null &amp;&amp; timeB == null) return 0;</span>
+<span class="nc bnc" id="L189" title="All 2 branches missed.">                if (timeA == null) return 1;</span>
+<span class="nc bnc" id="L190" title="All 2 branches missed.">                if (timeB == null) return -1;</span>
+<span class="nc" id="L191">                return timeB.compareTo(timeA);  // 降序</span>
+            });
+<span class="pc bpc" id="L193" title="1 of 2 branches missed.">        } else if (sortBy.equals(&quot;date_asc&quot;)) {</span>
+            // 按日期升序，如果日期相同则按时间戳升序
+<span class="nc" id="L195">            records.sort((a, b) -&gt; {</span>
+<span class="nc" id="L196">                LocalDate dateA = a.getRecordDate();</span>
+<span class="nc" id="L197">                LocalDate dateB = b.getRecordDate();</span>
+<span class="nc" id="L198">                LocalDateTime timeA = a.getRecordedAt();</span>
+<span class="nc" id="L199">                LocalDateTime timeB = b.getRecordedAt();</span>
+                
+                // 处理 null 值
+<span class="nc bnc" id="L202" title="All 4 branches missed.">                if (dateA == null &amp;&amp; dateB == null) {</span>
+                    // 如果日期都为null，按时间戳排序
+<span class="nc bnc" id="L204" title="All 4 branches missed.">                    if (timeA == null &amp;&amp; timeB == null) return 0;</span>
+<span class="nc bnc" id="L205" title="All 2 branches missed.">                    if (timeA == null) return 1;</span>
+<span class="nc bnc" id="L206" title="All 2 branches missed.">                    if (timeB == null) return -1;</span>
+<span class="nc" id="L207">                    return timeA.compareTo(timeB);  // 升序</span>
+                }
+<span class="nc bnc" id="L209" title="All 2 branches missed.">                if (dateA == null) return 1;  // null 排在后面</span>
+<span class="nc bnc" id="L210" title="All 2 branches missed.">                if (dateB == null) return -1;  // null 排在后面</span>
+                
+                // 先按日期比较
+<span class="nc" id="L213">                int dateCompare = dateA.compareTo(dateB);  // 升序</span>
+<span class="nc bnc" id="L214" title="All 2 branches missed.">                if (dateCompare != 0) {</span>
+<span class="nc" id="L215">                    return dateCompare;</span>
+                }
+                
+                // 日期相同，按时间戳排序
+<span class="nc bnc" id="L219" title="All 4 branches missed.">                if (timeA == null &amp;&amp; timeB == null) return 0;</span>
+<span class="nc bnc" id="L220" title="All 2 branches missed.">                if (timeA == null) return 1;</span>
+<span class="nc bnc" id="L221" title="All 2 branches missed.">                if (timeB == null) return -1;</span>
+<span class="nc" id="L222">                return timeA.compareTo(timeB);  // 升序</span>
+            });
+<span class="pc bpc" id="L224" title="1 of 2 branches missed.">        } else if (sortBy.equals(&quot;count&quot;)) {</span>
+<span class="nc" id="L225">            records.sort((a, b) -&gt; Integer.compare(b.getCount(), a.getCount()));</span>
+<span class="pc bpc" id="L226" title="1 of 2 branches missed.">        } else if (sortBy.equals(&quot;count_asc&quot;)) {</span>
+<span class="nc" id="L227">            records.sort((a, b) -&gt; Integer.compare(a.getCount(), b.getCount()));</span>
+<span class="pc bpc" id="L228" title="1 of 2 branches missed.">        } else if (sortBy.equals(&quot;duration&quot;)) {</span>
+<span class="nc" id="L229">            records.sort((a, b) -&gt; Integer.compare(b.getDuration(), a.getDuration()));</span>
+<span class="pc bpc" id="L230" title="1 of 2 branches missed.">        } else if (sortBy.equals(&quot;duration_asc&quot;)) {</span>
+<span class="nc" id="L231">            records.sort((a, b) -&gt; Integer.compare(a.getDuration(), b.getDuration()));</span>
+<span class="pc bpc" id="L232" title="1 of 2 branches missed.">        } else if (sortBy.equals(&quot;score&quot;)) {</span>
+<span class="pc bnc" id="L233" title="All 2 branches missed.">            records.sort((a, b) -&gt; Integer.compare(b.getScore() != null ? b.getScore() : 0, </span>
+<span class="nc bnc" id="L234" title="All 2 branches missed.">                                                   a.getScore() != null ? a.getScore() : 0));</span>
+<span class="nc bnc" id="L235" title="All 2 branches missed.">        } else if (sortBy.equals(&quot;score_asc&quot;)) {</span>
+<span class="nc bnc" id="L236" title="All 2 branches missed.">            records.sort((a, b) -&gt; Integer.compare(a.getScore() != null ? a.getScore() : 0, </span>
+<span class="nc bnc" id="L237" title="All 2 branches missed.">                                                   b.getScore() != null ? b.getScore() : 0));</span>
+<span class="nc bnc" id="L238" title="All 2 branches missed.">        } else if (sortBy.equals(&quot;accuracy&quot;)) {</span>
+<span class="nc bnc" id="L239" title="All 2 branches missed.">            records.sort((a, b) -&gt; Double.compare(b.getAccuracy() != null ? b.getAccuracy() : 0.0, </span>
+<span class="nc bnc" id="L240" title="All 2 branches missed.">                                                  a.getAccuracy() != null ? a.getAccuracy() : 0.0));</span>
+<span class="nc bnc" id="L241" title="All 2 branches missed.">        } else if (sortBy.equals(&quot;accuracy_asc&quot;)) {</span>
+<span class="nc bnc" id="L242" title="All 2 branches missed.">            records.sort((a, b) -&gt; Double.compare(a.getAccuracy() != null ? a.getAccuracy() : 0.0, </span>
+<span class="nc bnc" id="L243" title="All 2 branches missed.">                                                  b.getAccuracy() != null ? b.getAccuracy() : 0.0));</span>
+        } else {
+            // 默认按日期降序，如果日期相同则按时间戳降序（最新的在前）
+<span class="nc" id="L246">            records.sort((a, b) -&gt; {</span>
+<span class="nc" id="L247">                LocalDate dateA = a.getRecordDate();</span>
+<span class="nc" id="L248">                LocalDate dateB = b.getRecordDate();</span>
+<span class="nc" id="L249">                LocalDateTime timeA = a.getRecordedAt();</span>
+<span class="nc" id="L250">                LocalDateTime timeB = b.getRecordedAt();</span>
+                
+                // 处理 null 值
+<span class="nc bnc" id="L253" title="All 4 branches missed.">                if (dateA == null &amp;&amp; dateB == null) {</span>
+                    // 如果日期都为null，按时间戳排序
+<span class="nc bnc" id="L255" title="All 4 branches missed.">                    if (timeA == null &amp;&amp; timeB == null) return 0;</span>
+<span class="nc bnc" id="L256" title="All 2 branches missed.">                    if (timeA == null) return 1;</span>
+<span class="nc bnc" id="L257" title="All 2 branches missed.">                    if (timeB == null) return -1;</span>
+<span class="nc" id="L258">                    return timeB.compareTo(timeA);  // 降序</span>
+                }
+<span class="nc bnc" id="L260" title="All 2 branches missed.">                if (dateA == null) return 1;  // null 排在后面</span>
+<span class="nc bnc" id="L261" title="All 2 branches missed.">                if (dateB == null) return -1;  // null 排在后面</span>
+                
+                // 先按日期比较
+<span class="nc" id="L264">                int dateCompare = dateB.compareTo(dateA);  // 降序</span>
+<span class="nc bnc" id="L265" title="All 2 branches missed.">                if (dateCompare != 0) {</span>
+<span class="nc" id="L266">                    return dateCompare;</span>
+                }
+                
+                // 日期相同，按时间戳排序
+<span class="nc bnc" id="L270" title="All 4 branches missed.">                if (timeA == null &amp;&amp; timeB == null) return 0;</span>
+<span class="nc bnc" id="L271" title="All 2 branches missed.">                if (timeA == null) return 1;</span>
+<span class="nc bnc" id="L272" title="All 2 branches missed.">                if (timeB == null) return -1;</span>
+<span class="nc" id="L273">                return timeB.compareTo(timeA);  // 降序</span>
+            });
+        }
+        
+<span class="fc" id="L277">        return records;</span>
+    }
+    
+    /**
+     * 获取最近的记录
+     */
+    public List&lt;ExerciseRecord&gt; getRecentRecords(String userId) {
+<span class="nc" id="L284">        return exerciseRecordRepository.findTop10ByUserIdOrderByRecordedAtDesc(userId);</span>
+    }
+    
+    /**
+     * 获取今日某运动的总次数
+     */
+    public int getTodayCountByExercise(String userId, String exerciseType) {
+<span class="nc" id="L291">        ZoneId beijingZone = ZoneId.of(&quot;Asia/Shanghai&quot;);</span>
+<span class="nc" id="L292">        Integer count = exerciseRecordRepository.getTodayCountByExercise(userId, LocalDate.now(beijingZone), exerciseType);</span>
+<span class="nc bnc" id="L293" title="All 2 branches missed.">        return count != null ? count : 0;</span>
+    }
+    
+    /**
+     * 获取今日总次数
+     */
+    public int getTodayTotalCount(String userId) {
+<span class="nc" id="L300">        ZoneId beijingZone = ZoneId.of(&quot;Asia/Shanghai&quot;);</span>
+<span class="nc" id="L301">        Integer count = exerciseRecordRepository.getTodayTotalCount(userId, LocalDate.now(beijingZone));</span>
+<span class="nc bnc" id="L302" title="All 2 branches missed.">        return count != null ? count : 0;</span>
+    }
+    
+    /**
+     * 获取每日统计
+     */
+    public List&lt;DailyStats&gt; getDailyStats(String userId, LocalDate startDate, LocalDate endDate) {
+<span class="nc" id="L309">        return dailyStatsRepository.findByUserIdAndStatDateBetweenOrderByStatDateDesc(userId, startDate, endDate);</span>
+    }
+    
+    /**
+     * 获取今日统计
+     */
+    public List&lt;DailyStats&gt; getTodayStats(String userId) {
+<span class="nc" id="L316">        ZoneId beijingZone = ZoneId.of(&quot;Asia/Shanghai&quot;);</span>
+<span class="nc" id="L317">        return dailyStatsRepository.findByUserIdAndStatDate(userId, LocalDate.now(beijingZone));</span>
+    }
+    
+    /**
+     * 统计无效记录数量
+     * @param minCount 最小有效次数
+     * @param minDuration 最小有效时长（秒）
+     */
+    public long countInvalidRecords(int minCount, int minDuration) {
+<span class="nc" id="L326">        return exerciseRecordRepository.countInvalidRecords(minCount, minDuration);</span>
+    }
+    
+    /**
+     * 清理无效记录
+     * @param minCount 最小有效次数
+     * @param minDuration 最小有效时长（秒）
+     * @return 删除的记录数
+     */
+    public int cleanupInvalidRecords(int minCount, int minDuration) {
+<span class="nc" id="L336">        return exerciseRecordRepository.deleteInvalidRecords(minCount, minDuration);</span>
+    }
+    
+    /**
+     * 获取无效记录列表（用于预览）
+     */
+    public List&lt;ExerciseRecord&gt; getInvalidRecords(int minCount, int minDuration) {
+<span class="nc" id="L343">        return exerciseRecordRepository.findInvalidRecords(minCount, minDuration);</span>
+    }
+    
+    /**
+     * 获取仪表板数据
+     * 包括：最近30天的进度、卡路里消耗、历史锻炼数据
+     */
+    public Map&lt;String, Object&gt; getDashboardData(String userId) {
+<span class="fc" id="L351">        ZoneId beijingZone = ZoneId.of(&quot;Asia/Shanghai&quot;);</span>
+<span class="fc" id="L352">        LocalDate endDate = LocalDate.now(beijingZone);</span>
+<span class="fc" id="L353">        LocalDate startDate = endDate.minusDays(29); // 最近30天</span>
+        
+        // 获取用户信息
+<span class="fc" id="L356">        User user = getOrCreateUser(userId);</span>
+        
+        // 获取所有历史记录（最近30天）
+<span class="fc" id="L359">        List&lt;ExerciseRecord&gt; allRecords = getHistoryRecords(userId);</span>
+        
+        // 过滤最近30天的记录（过滤掉 recordDate 为 null 的记录，避免 NullPointerException）
+<span class="fc" id="L362">        List&lt;ExerciseRecord&gt; recentRecords = allRecords.stream()</span>
+<span class="pc bnc" id="L363" title="All 2 branches missed.">                .filter(r -&gt; r.getRecordDate() != null)</span>
+<span class="pc bnc" id="L364" title="All 4 branches missed.">                .filter(r -&gt; !r.getRecordDate().isBefore(startDate) &amp;&amp; !r.getRecordDate().isAfter(endDate))</span>
+<span class="fc" id="L365">                .collect(Collectors.toList());</span>
+        
+        // 计算总卡路里（从最近30天记录计算，与每日数据保持一致）
+<span class="fc" id="L368">        int totalCalories = recentRecords.stream()</span>
+<span class="pc" id="L369">                .mapToInt(r -&gt; calculateCalories(r.getExerciseType(), r.getDuration(), user.getWeight()))</span>
+<span class="fc" id="L370">                .sum();</span>
+        
+        // 计算总训练次数（最近30天）
+<span class="fc" id="L373">        int totalSessions = recentRecords.size();</span>
+        
+        // 计算总时长（分钟，最近30天）
+<span class="fc" id="L376">        int totalDurationMinutes = recentRecords.stream()</span>
+<span class="fc" id="L377">                .mapToInt(ExerciseRecord::getDuration)</span>
+<span class="fc" id="L378">                .sum() / 60;</span>
+        
+        // 按日期组织数据（用于图表）- 直接从ExerciseRecord计算，确保卡路里正确
+<span class="fc" id="L381">        Map&lt;LocalDate, Map&lt;String, Object&gt;&gt; dailyDataMap = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L382" title="All 2 branches covered.">        for (LocalDate date = startDate; !date.isAfter(endDate); date = date.plusDays(1)) {</span>
+<span class="fc" id="L383">            Map&lt;String, Object&gt; dayData = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L384">            dayData.put(&quot;date&quot;, date.toString());</span>
+<span class="fc" id="L385">            dayData.put(&quot;calories&quot;, 0);</span>
+<span class="fc" id="L386">            dayData.put(&quot;count&quot;, 0);</span>
+<span class="fc" id="L387">            dayData.put(&quot;duration&quot;, 0);</span>
+<span class="fc" id="L388">            dailyDataMap.put(date, dayData);</span>
+        }
+        
+        // 从ExerciseRecord填充每日数据（确保卡路里正确计算）
+        // 注意：duration 统一转换为分钟，与 summary.total_duration_minutes 保持一致
+        // 先累加秒数，最后统一转换为分钟，避免精度丢失
+<span class="pc bpc" id="L394" title="1 of 2 branches missed.">        for (ExerciseRecord record : recentRecords) {</span>
+<span class="nc" id="L395">            LocalDate date = record.getRecordDate();</span>
+            // 跳过 recordDate 为 null 的记录（虽然已过滤，但双重检查更安全）
+<span class="nc bnc" id="L397" title="All 4 branches missed.">            if (date == null || !dailyDataMap.containsKey(date)) {</span>
+<span class="nc" id="L398">                continue;</span>
+            }
+<span class="nc" id="L400">            Map&lt;String, Object&gt; dayData = dailyDataMap.get(date);</span>
+<span class="nc" id="L401">            dayData.put(&quot;calories&quot;, ((Integer) dayData.get(&quot;calories&quot;)) + </span>
+<span class="nc" id="L402">                    calculateCalories(record.getExerciseType(), record.getDuration(), user.getWeight()));</span>
+<span class="nc" id="L403">            dayData.put(&quot;count&quot;, ((Integer) dayData.get(&quot;count&quot;)) + record.getCount());</span>
+            // 累加秒数（先不转换，避免精度丢失）
+<span class="nc" id="L405">            dayData.put(&quot;duration&quot;, ((Integer) dayData.get(&quot;duration&quot;)) + record.getDuration());</span>
+<span class="nc" id="L406">        }</span>
+        
+        // 将每日数据的秒数统一转换为分钟
+<span class="fc bfc" id="L409" title="All 2 branches covered.">        for (Map&lt;String, Object&gt; dayData : dailyDataMap.values()) {</span>
+<span class="fc" id="L410">            int totalSeconds = (Integer) dayData.get(&quot;duration&quot;);</span>
+<span class="fc" id="L411">            dayData.put(&quot;duration&quot;, totalSeconds / 60);  // 转换为分钟</span>
+<span class="fc" id="L412">        }</span>
+        
+        // 按运动类型统计（最近30天）
+        // 注意：total_duration 统一转换为分钟，与 summary.total_duration_minutes 保持一致
+<span class="fc" id="L416">        Map&lt;String, Map&lt;String, Object&gt;&gt; exerciseStats = new HashMap&lt;&gt;();</span>
+<span class="pc bpc" id="L417" title="1 of 2 branches missed.">        for (ExerciseRecord record : recentRecords) {</span>
+<span class="nc" id="L418">            String exerciseType = record.getExerciseType();</span>
+<span class="nc" id="L419">            exerciseStats.putIfAbsent(exerciseType, new HashMap&lt;&gt;());</span>
+<span class="nc" id="L420">            Map&lt;String, Object&gt; stats = exerciseStats.get(exerciseType);</span>
+<span class="nc" id="L421">            stats.put(&quot;exercise_type&quot;, exerciseType);</span>
+<span class="nc" id="L422">            stats.put(&quot;total_count&quot;, ((Integer) stats.getOrDefault(&quot;total_count&quot;, 0)) + record.getCount());</span>
+            // 累加秒数（先不转换，避免精度丢失）
+<span class="nc" id="L424">            stats.put(&quot;total_duration&quot;, ((Integer) stats.getOrDefault(&quot;total_duration&quot;, 0)) + record.getDuration());</span>
+<span class="nc" id="L425">            stats.put(&quot;total_calories&quot;, ((Integer) stats.getOrDefault(&quot;total_calories&quot;, 0)) + </span>
+<span class="nc" id="L426">                    calculateCalories(exerciseType, record.getDuration(), user.getWeight()));</span>
+<span class="nc" id="L427">            stats.put(&quot;sessions&quot;, ((Integer) stats.getOrDefault(&quot;sessions&quot;, 0)) + 1);</span>
+<span class="nc" id="L428">        }</span>
+        
+        // 将运动类型统计的秒数统一转换为分钟
+<span class="pc bpc" id="L431" title="1 of 2 branches missed.">        for (Map&lt;String, Object&gt; stats : exerciseStats.values()) {</span>
+<span class="nc" id="L432">            int totalSeconds = (Integer) stats.get(&quot;total_duration&quot;);</span>
+<span class="nc" id="L433">            stats.put(&quot;total_duration&quot;, totalSeconds / 60);  // 转换为分钟</span>
+<span class="nc" id="L434">        }</span>
+        
+        // 构建返回数据
+<span class="fc" id="L437">        Map&lt;String, Object&gt; dashboard = new HashMap&lt;&gt;();</span>
+        // 使用 HashMap 而不是 Map.of()，因为 Map.of() 不允许 null 值
+        // 如果用户字段为 null，使用默认值避免 NullPointerException
+<span class="fc" id="L440">        Map&lt;String, Object&gt; userData = new HashMap&lt;&gt;();</span>
+<span class="pc bpc" id="L441" title="1 of 2 branches missed.">        userData.put(&quot;name&quot;, user.getName() != null ? user.getName() : &quot;健身达人&quot;);</span>
+<span class="pc bpc" id="L442" title="1 of 2 branches missed.">        userData.put(&quot;weight&quot;, user.getWeight() != null ? user.getWeight() : 65);</span>
+<span class="pc bpc" id="L443" title="1 of 2 branches missed.">        userData.put(&quot;goal&quot;, user.getGoal() != null ? user.getGoal() : &quot;减脂&quot;);</span>
+<span class="fc" id="L444">        dashboard.put(&quot;user&quot;, userData);</span>
+<span class="fc" id="L445">        dashboard.put(&quot;summary&quot;, Map.of(</span>
+<span class="fc" id="L446">                &quot;total_calories&quot;, totalCalories,</span>
+<span class="fc" id="L447">                &quot;total_sessions&quot;, totalSessions,</span>
+<span class="fc" id="L448">                &quot;total_duration_minutes&quot;, totalDurationMinutes,</span>
+<span class="fc" id="L449">                &quot;total_count&quot;, recentRecords.stream().mapToInt(ExerciseRecord::getCount).sum()</span>
+        ));
+<span class="fc" id="L451">        dashboard.put(&quot;daily_data&quot;, new ArrayList&lt;&gt;(dailyDataMap.values()));</span>
+<span class="fc" id="L452">        dashboard.put(&quot;exercise_stats&quot;, new ArrayList&lt;&gt;(exerciseStats.values()));</span>
+        // 最近记录（最近30天，按日期倒序，最多10条）
+        // 注意：duration 统一转换为分钟，与 summary.total_duration_minutes 保持一致
+        // 使用 null-safe 排序，将 null 值排在最后
+<span class="fc" id="L456">        dashboard.put(&quot;recent_records&quot;, recentRecords.stream()</span>
+<span class="fc" id="L457">                .sorted((a, b) -&gt; {</span>
+<span class="nc" id="L458">                    LocalDate dateA = a.getRecordDate();</span>
+<span class="nc" id="L459">                    LocalDate dateB = b.getRecordDate();</span>
+<span class="nc bnc" id="L460" title="All 4 branches missed.">                    if (dateA == null &amp;&amp; dateB == null) return 0;</span>
+<span class="nc bnc" id="L461" title="All 2 branches missed.">                    if (dateA == null) return 1;  // null 排在后面</span>
+<span class="nc bnc" id="L462" title="All 2 branches missed.">                    if (dateB == null) return -1;  // null 排在后面</span>
+<span class="nc" id="L463">                    return dateB.compareTo(dateA);  // 倒序</span>
+                })
+<span class="fc" id="L465">                .limit(10)</span>
+<span class="fc" id="L466">                .map(r -&gt; {</span>
+                    // 使用 HashMap 而不是 Map.of()，因为需要处理可能的 null 值
+<span class="nc" id="L468">                    Map&lt;String, Object&gt; recordMap = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L469">                    recordMap.put(&quot;id&quot;, r.getId());</span>
+<span class="nc" id="L470">                    recordMap.put(&quot;exercise_type&quot;, r.getExerciseType());</span>
+<span class="nc" id="L471">                    recordMap.put(&quot;count&quot;, r.getCount());</span>
+                    // 返回秒数，前端自己格式化显示（分钟和秒）
+<span class="nc bnc" id="L473" title="All 2 branches missed.">                    recordMap.put(&quot;duration&quot;, r.getDuration() != null ? r.getDuration() : 0);</span>
+                    // 添加空值检查，避免 NullPointerException，使用方法开头定义的 beijingZone
+<span class="nc bnc" id="L475" title="All 2 branches missed.">                    recordMap.put(&quot;date&quot;, r.getRecordDate() != null ? r.getRecordDate().toString() : LocalDate.now(beijingZone).toString());</span>
+<span class="nc" id="L476">                    recordMap.put(&quot;calories&quot;, calculateCalories(r.getExerciseType(), r.getDuration(), user.getWeight()));</span>
+<span class="nc" id="L477">                    return recordMap;</span>
+                })
+<span class="fc" id="L479">                .collect(Collectors.toList()));</span>
+        
+<span class="fc" id="L481">        return dashboard;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

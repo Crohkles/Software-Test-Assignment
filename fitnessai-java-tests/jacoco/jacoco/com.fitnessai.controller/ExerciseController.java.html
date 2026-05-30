@@ -1,0 +1,249 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExerciseController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">FitnessAI Backend</a> &gt; <a href="index.source.html" class="el_package">com.fitnessai.controller</a> &gt; <span class="el_source">ExerciseController.java</span></div><h1>ExerciseController.java</h1><pre class="source lang-java linenums">package com.fitnessai.controller;
+
+import com.fitnessai.dto.PoseAnalysisRequest;
+import com.fitnessai.dto.PoseAnalysisResponse;
+import com.fitnessai.analyzer.PoseAnalyzer;
+import com.fitnessai.analyzer.PoseAnalyzerFactory;
+import com.fitnessai.model.ExerciseType;
+import com.fitnessai.model.PoseLandmark;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
+
+/**
+ * 运动分析控制器
+ *
+ * 提供姿势分析和运动数据提交的API接口
+ */
+@RestController
+@RequestMapping(&quot;/api&quot;)
+@CrossOrigin(origins = &quot;*&quot;, maxAge = 3600)
+<span class="fc" id="L25">public class ExerciseController {</span>
+
+<span class="fc" id="L27">    private static final Logger logger = LoggerFactory.getLogger(ExerciseController.class);</span>
+
+    @Autowired
+    private PoseAnalyzerFactory analyzerFactory;
+
+    /**
+     * 获取支持的运动类型列表
+     *
+     * @return 运动类型列表
+     */
+    @GetMapping(&quot;/exercises&quot;)
+    public ResponseEntity&lt;?&gt; getExercises() {
+<span class="fc" id="L39">        logger.info(&quot;📋 获取运动类型列表&quot;);</span>
+
+<span class="fc" id="L41">        ExerciseInfo[] exercises = {</span>
+            new ExerciseInfo(
+                &quot;squat&quot;, &quot;深蹲&quot;,
+                &quot;训练大腿和臀部肌肉的经典动作&quot;,
+                &quot;easy&quot;,
+                new String[]{&quot;大腿&quot;, &quot;臀部&quot;, &quot;核心&quot;},
+                new String[]{
+                    &quot;双脚与肩同宽站立&quot;,
+                    &quot;膝盖弯曲，臀部向后坐&quot;,
+                    &quot;保持背部挺直&quot;,
+                    &quot;大腿与地面平行时停止&quot;,
+                    &quot;缓慢回到起始位置&quot;
+                }
+            ),
+            new ExerciseInfo(
+                &quot;pushup&quot;, &quot;俯卧撑&quot;,
+                &quot;上肢力量训练的基础动作&quot;,
+                &quot;medium&quot;,
+                new String[]{&quot;胸部&quot;, &quot;肩部&quot;, &quot;三头肌&quot;},
+                new String[]{
+                    &quot;俯卧撑起始位置&quot;,
+                    &quot;手掌与肩同宽&quot;,
+                    &quot;身体保持一条直线&quot;,
+                    &quot;胸部贴近地面&quot;,
+                    &quot;推起回到起始位置&quot;
+                }
+            ),
+            new ExerciseInfo(
+                &quot;plank&quot;, &quot;平板支撑&quot;,
+                &quot;核心稳定性训练的金标准&quot;,
+                &quot;medium&quot;,
+                new String[]{&quot;核心&quot;, &quot;肩部&quot;, &quot;背部&quot;},
+                new String[]{
+                    &quot;俯卧支撑姿势&quot;,
+                    &quot;前臂贴地，肘部在肩膀下方&quot;,
+                    &quot;身体保持一条直线&quot;,
+                    &quot;收紧核心肌群&quot;,
+                    &quot;保持静止状态&quot;
+                }
+            ),
+            new ExerciseInfo(
+                &quot;jumping_jack&quot;, &quot;开合跳&quot;,
+                &quot;全身有氧运动，提高心率&quot;,
+                &quot;easy&quot;,
+                new String[]{&quot;全身&quot;, &quot;心肺&quot;},
+                new String[]{
+                    &quot;双脚并拢站立&quot;,
+                    &quot;跳起时双腿分开&quot;,
+                    &quot;同时双臂上举过头&quot;,
+                    &quot;跳回起始位置&quot;,
+                    &quot;保持节奏连续进行&quot;
+                }
+            )
+        };
+
+<span class="fc" id="L96">        return ResponseEntity.ok(exercises);</span>
+    }
+
+    /**
+     * 分析姿态数据
+     *
+     * @param request 姿势分析请求
+     * @return 分析结果
+     */
+    @PostMapping(&quot;/analytics/pose&quot;)
+    public ResponseEntity&lt;?&gt; analyzePose(@RequestBody PoseAnalysisRequest request) {
+<span class="fc" id="L107">        logger.info(&quot;🎯 接收到姿势分析请求: {}&quot;, request);</span>
+
+        try {
+            // 验证请求参数
+<span class="fc bfc" id="L111" title="All 2 branches covered.">            if (!request.isValid()) {</span>
+<span class="fc" id="L112">                logger.warn(&quot;❌ 无效的姿势分析请求: {}&quot;, request);</span>
+<span class="fc" id="L113">                PoseAnalysisResponse errorResponse = PoseAnalysisResponse.error(</span>
+                    &quot;请求数据无效，请检查姿态数据完整性&quot;
+                );
+<span class="fc" id="L116">                return ResponseEntity.badRequest().body(errorResponse);</span>
+            }
+
+            // 获取分析器
+<span class="fc" id="L120">            ExerciseType exerciseType = request.getExerciseType();</span>
+<span class="fc" id="L121">            logger.info(&quot;🔍 解析后的运动类型: {} (ordinal={})&quot;, exerciseType, exerciseType.ordinal());</span>
+            
+<span class="fc" id="L123">            PoseAnalyzer analyzer = analyzerFactory.createAnalyzer(exerciseType);</span>
+<span class="fc" id="L124">            logger.info(&quot;🔧 使用分析器: {}&quot;, analyzer.getClass().getSimpleName());</span>
+
+            // 进行姿势分析
+<span class="fc" id="L127">            PoseAnalysisResponse response = analyzer.analyze(request.getPoseLandmarks());</span>
+
+<span class="fc" id="L129">            logger.info(&quot;✅ 姿势分析完成 - 运动: {}, 计数: {}, 得分: {}, 反馈: {}&quot;,</span>
+<span class="fc" id="L130">                       exerciseType, response.getCount(), response.getScore(), response.getFeedback());</span>
+
+<span class="fc" id="L132">            return ResponseEntity.ok(response);</span>
+
+<span class="nc" id="L134">        } catch (Exception e) {</span>
+<span class="nc" id="L135">            logger.error(&quot;❌ 姿势分析错误: {}&quot;, e.getMessage(), e);</span>
+<span class="nc" id="L136">            PoseAnalysisResponse errorResponse = PoseAnalysisResponse.error(</span>
+<span class="nc" id="L137">                &quot;分析失败: &quot; + e.getMessage()</span>
+            );
+<span class="nc" id="L139">            return ResponseEntity.internalServerError().body(errorResponse);</span>
+        }
+    }
+
+    /**
+     * 重置指定运动类型的分析器
+     *
+     * @param exerciseType 运动类型 (squat, pushup, plank, jumping_jack)
+     * @return 重置结果
+     */
+    @PostMapping(&quot;/analyzer/reset/{exerciseType}&quot;)
+    public ResponseEntity&lt;?&gt; resetAnalyzer(@PathVariable String exerciseType) {
+<span class="fc" id="L151">        logger.info(&quot;🔄 重置分析器请求: {}&quot;, exerciseType);</span>
+
+        try {
+<span class="fc" id="L154">            ExerciseType type = ExerciseType.fromId(exerciseType);</span>
+<span class="pc bpc" id="L155" title="1 of 2 branches missed.">            if (type == null) {</span>
+<span class="nc" id="L156">                return ResponseEntity.badRequest().body(</span>
+<span class="nc" id="L157">                    Map.of(&quot;error&quot;, &quot;Unknown exercise type: &quot; + exerciseType)</span>
+                );
+            }
+
+<span class="fc" id="L161">            PoseAnalyzer analyzer = analyzerFactory.getAnalyzer(type);</span>
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">            if (analyzer != null) {</span>
+<span class="fc" id="L163">                analyzer.reset();</span>
+<span class="fc" id="L164">                logger.info(&quot;✅ 分析器已重置: {}&quot;, exerciseType);</span>
+<span class="fc" id="L165">                return ResponseEntity.ok(Map.of(</span>
+                    &quot;message&quot;, &quot;Analyzer reset successfully&quot;,
+                    &quot;exercise_type&quot;, exerciseType
+                ));
+            } else {
+                // 如果分析器不存在，创建一个新的（会自动是干净的）
+<span class="nc" id="L171">                analyzerFactory.createAnalyzer(type);</span>
+<span class="nc" id="L172">                logger.info(&quot;✅ 创建新的分析器: {}&quot;, exerciseType);</span>
+<span class="nc" id="L173">                return ResponseEntity.ok(Map.of(</span>
+                    &quot;message&quot;, &quot;New analyzer created&quot;,
+                    &quot;exercise_type&quot;, exerciseType
+                ));
+            }
+
+<span class="nc" id="L179">        } catch (Exception e) {</span>
+<span class="nc" id="L180">            logger.error(&quot;❌ 重置分析器失败: {}&quot;, e.getMessage(), e);</span>
+<span class="nc" id="L181">            return ResponseEntity.internalServerError().body(</span>
+<span class="nc" id="L182">                Map.of(&quot;error&quot;, &quot;Failed to reset analyzer: &quot; + e.getMessage())</span>
+            );
+        }
+    }
+
+    /**
+     * 获取个性化推荐
+     *
+     * @param userId 用户ID（可选）
+     * @param currentExercise 当前运动类型（可选）
+     * @return 推荐信息
+     */
+    @GetMapping(&quot;/recommendations&quot;)
+    public ResponseEntity&lt;?&gt; getRecommendations(
+            @RequestParam(required = false, defaultValue = &quot;anonymous&quot;) String userId,
+            @RequestParam(required = false, defaultValue = &quot;squat&quot;) String currentExercise) {
+
+<span class="nc" id="L199">        logger.info(&quot;🎯 获取个性化推荐 - 用户: {}, 当前运动: {}&quot;, userId, currentExercise);</span>
+
+        try {
+<span class="nc" id="L202">            ExerciseType currentType = ExerciseType.fromId(currentExercise);</span>
+
+            // TODO: 基于用户历史数据生成个性化推荐
+<span class="nc" id="L205">            Map&lt;String, Object&gt; recommendations = Map.of(</span>
+                &quot;next_exercises&quot;, new Object[]{
+<span class="nc" id="L207">                    Map.of(&quot;id&quot;, &quot;pushup&quot;, &quot;name&quot;, &quot;俯卧撑&quot;, &quot;reason&quot;, &quot;增强上肢力量&quot;),</span>
+<span class="nc" id="L208">                    Map.of(&quot;id&quot;, &quot;plank&quot;, &quot;name&quot;, &quot;平板支撑&quot;, &quot;reason&quot;, &quot;强化核心稳定&quot;)</span>
+                },
+                &quot;difficulty_adjustment&quot;, &quot;maintain&quot;,  // increase, decrease, maintain
+<span class="nc" id="L211">                &quot;suggested_sets&quot;, 3,</span>
+<span class="nc" id="L212">                &quot;suggested_reps&quot;, 15,</span>
+<span class="nc" id="L213">                &quot;rest_time&quot;, 60  // 秒</span>
+            );
+
+<span class="nc" id="L216">            logger.info(&quot;✅ 个性化推荐生成完成&quot;);</span>
+<span class="nc" id="L217">            return ResponseEntity.ok(recommendations);</span>
+
+<span class="nc" id="L219">        } catch (Exception e) {</span>
+<span class="nc" id="L220">            logger.error(&quot;❌ 获取推荐错误: {}&quot;, e.getMessage(), e);</span>
+<span class="nc" id="L221">            return ResponseEntity.internalServerError().body(</span>
+<span class="nc" id="L222">                Map.of(&quot;error&quot;, &quot;Failed to get recommendations: &quot; + e.getMessage())</span>
+            );
+        }
+    }
+
+    /**
+     * 运动信息数据类
+     */
+    public static class ExerciseInfo {
+        public String id;
+        public String name;
+        public String description;
+        public String difficulty;
+        public String[] target_muscles;
+        public String[] instructions;
+
+        public ExerciseInfo(String id, String name, String description, String difficulty,
+<span class="fc" id="L239">                          String[] target_muscles, String[] instructions) {</span>
+<span class="fc" id="L240">            this.id = id;</span>
+<span class="fc" id="L241">            this.name = name;</span>
+<span class="fc" id="L242">            this.description = description;</span>
+<span class="fc" id="L243">            this.difficulty = difficulty;</span>
+<span class="fc" id="L244">            this.target_muscles = target_muscles;</span>
+<span class="fc" id="L245">            this.instructions = instructions;</span>
+<span class="fc" id="L246">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

@@ -1,0 +1,20 @@
+@startuml
+title FitnessAI Squat State Machine
+
+hide empty description
+skinparam backgroundColor transparent
+skinparam shadowing false
+
+[*] --> UP : 初始化 Session
+UP --> DESCENDING : 关节夹角变小
+DESCENDING --> DOWN : 进入最低点
+DOWN --> ASCENDING : 起身开始
+ASCENDING --> UP : 恢复直立 / count++
+
+note right of UP
+TC-ST-005 对应独立 reset 接口：
+POST /api/analyzer/reset/{type}
+该行为不作为主状态机内部状态节点表示
+end note
+
+@enduml

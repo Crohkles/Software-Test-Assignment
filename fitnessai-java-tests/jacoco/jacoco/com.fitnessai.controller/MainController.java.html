@@ -1,0 +1,396 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MainController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">FitnessAI Backend</a> &gt; <a href="index.source.html" class="el_package">com.fitnessai.controller</a> &gt; <span class="el_source">MainController.java</span></div><h1>MainController.java</h1><pre class="source lang-java linenums">package com.fitnessai.controller;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.web.bind.annotation.*;
+
+import java.lang.management.ManagementFactory;
+import java.time.LocalDateTime;
+import java.util.Map;
+
+/**
+ * 主控制器
+ *
+ * 提供基础API接口和演示页面
+ */
+@RestController
+@RequestMapping
+@CrossOrigin(origins = &quot;*&quot;, maxAge = 3600)
+@io.swagger.v3.oas.annotations.Hidden
+<span class="fc" id="L20">public class MainController {</span>
+
+<span class="fc" id="L22">    private static final Logger logger = LoggerFactory.getLogger(MainController.class);</span>
+
+    /**
+     * API状态接口
+     *
+     * @return API状态信息
+     */
+    @GetMapping(&quot;/api&quot;)
+    public Map&lt;String, Object&gt; apiStatus() {
+<span class="nc" id="L31">        logger.info(&quot;📡 API状态检查&quot;);</span>
+
+<span class="nc" id="L33">        return Map.of(</span>
+            &quot;message&quot;, &quot;FitnessAI Backend API&quot;,
+            &quot;version&quot;, &quot;1.0.0&quot;,
+            &quot;status&quot;, &quot;running&quot;,
+<span class="nc" id="L37">            &quot;timestamp&quot;, LocalDateTime.now(),</span>
+            &quot;framework&quot;, &quot;Spring Boot&quot;,
+<span class="nc" id="L39">            &quot;java_version&quot;, System.getProperty(&quot;java.version&quot;)</span>
+        );
+    }
+
+    /**
+     * 健康检查接口
+     *
+     * @return 健康状态
+     */
+    @GetMapping(&quot;/api/health&quot;)
+    public Map&lt;String, Object&gt; healthCheck() {
+<span class="nc" id="L50">        return Map.of(</span>
+            &quot;status&quot;, &quot;UP&quot;,
+<span class="nc" id="L52">            &quot;timestamp&quot;, LocalDateTime.now(),</span>
+<span class="nc" id="L53">            &quot;uptime&quot;, getUptime()</span>
+        );
+    }
+
+    /**
+     * 系统信息接口
+     *
+     * @return 系统信息
+     */
+    @GetMapping(&quot;/api/system&quot;)
+    public Map&lt;String, Object&gt; systemInfo() {
+<span class="nc" id="L64">        Runtime runtime = Runtime.getRuntime();</span>
+
+<span class="nc" id="L66">        return Map.of(</span>
+<span class="nc" id="L67">            &quot;java_version&quot;, System.getProperty(&quot;java.version&quot;),</span>
+<span class="nc" id="L68">            &quot;java_vendor&quot;, System.getProperty(&quot;java.vendor&quot;),</span>
+<span class="nc" id="L69">            &quot;os_name&quot;, System.getProperty(&quot;os.name&quot;),</span>
+<span class="nc" id="L70">            &quot;os_version&quot;, System.getProperty(&quot;os.version&quot;),</span>
+<span class="nc" id="L71">            &quot;os_arch&quot;, System.getProperty(&quot;os.arch&quot;),</span>
+<span class="nc" id="L72">            &quot;available_processors&quot;, runtime.availableProcessors(),</span>
+<span class="nc" id="L73">            &quot;max_memory&quot;, formatBytes(runtime.maxMemory()),</span>
+<span class="nc" id="L74">            &quot;total_memory&quot;, formatBytes(runtime.totalMemory()),</span>
+<span class="nc" id="L75">            &quot;free_memory&quot;, formatBytes(runtime.freeMemory())</span>
+        );
+    }
+
+    /**
+     * 演示页面HTML
+     *
+     * @return 演示页面HTML
+     */
+    @GetMapping(&quot;/demo&quot;)
+    public String demoPage() {
+<span class="nc" id="L86">        return generateDemoHtml();</span>
+    }
+
+    /**
+     * 根路径重定向到演示页面
+     *
+     * @return 演示页面HTML
+     */
+    @GetMapping(&quot;/&quot;)
+    public String index() {
+<span class="nc" id="L96">        return generateDemoHtml();</span>
+    }
+
+    /**
+     * 计算系统运行时间
+     *
+     * @return 运行时间描述
+     */
+    private String getUptime() {
+<span class="nc" id="L105">        long uptime = ManagementFactory.getRuntimeMXBean().getUptime();</span>
+<span class="nc" id="L106">        long hours = uptime / (1000 * 60 * 60);</span>
+<span class="nc" id="L107">        long minutes = (uptime % (1000 * 60 * 60)) / (1000 * 60);</span>
+<span class="nc" id="L108">        long seconds = ((uptime % (1000 * 60 * 60)) % (1000 * 60)) / 1000;</span>
+
+<span class="nc" id="L110">        return String.format(&quot;%d小时%d分钟%d秒&quot;, hours, minutes, seconds);</span>
+    }
+
+    /**
+     * 格式化字节数为可读格式
+     *
+     * @param bytes 字节数
+     * @return 格式化后的字符串
+     */
+    private String formatBytes(long bytes) {
+<span class="nc bnc" id="L120" title="All 2 branches missed.">        if (bytes &lt; 1024) return bytes + &quot; B&quot;;</span>
+<span class="nc bnc" id="L121" title="All 2 branches missed.">        if (bytes &lt; 1024 * 1024) return String.format(&quot;%.1f KB&quot;, bytes / 1024.0);</span>
+<span class="nc bnc" id="L122" title="All 2 branches missed.">        if (bytes &lt; 1024 * 1024 * 1024) return String.format(&quot;%.1f MB&quot;, bytes / (1024.0 * 1024.0));</span>
+<span class="nc" id="L123">        return String.format(&quot;%.1f GB&quot;, bytes / (1024.0 * 1024.0 * 1024.0));</span>
+    }
+
+    /**
+     * 生成演示页面HTML
+     *
+     * @return 演示页面HTML
+     */
+    private String generateDemoHtml() {
+<span class="nc" id="L132">        return &quot;&lt;!DOCTYPE html&gt;\n&quot; +</span>
+               &quot;&lt;html&gt;\n&quot; +
+               &quot;&lt;head&gt;\n&quot; +
+               &quot;    &lt;title&gt;FitnessAI Java Backend Demo&lt;/title&gt;\n&quot; +
+               &quot;    &lt;meta charset=\&quot;UTF-8\&quot;&gt;\n&quot; +
+               &quot;    &lt;style&gt;\n&quot; +
+               &quot;        body {\n&quot; +
+               &quot;            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;\n&quot; +
+               &quot;            margin: 0;\n&quot; +
+               &quot;            padding: 40px;\n&quot; +
+               &quot;            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);\n&quot; +
+               &quot;            color: white;\n&quot; +
+               &quot;            min-height: 100vh;\n&quot; +
+               &quot;        }\n&quot; +
+               &quot;        .container {\n&quot; +
+               &quot;            max-width: 800px;\n&quot; +
+               &quot;            margin: 0 auto;\n&quot; +
+               &quot;            background: rgba(255,255,255,0.1);\n&quot; +
+               &quot;            padding: 30px;\n&quot; +
+               &quot;            border-radius: 15px;\n&quot; +
+               &quot;            backdrop-filter: blur(10px);\n&quot; +
+               &quot;            box-shadow: 0 8px 32px rgba(0,0,0,0.1);\n&quot; +
+               &quot;        }\n&quot; +
+               &quot;        h1 {\n&quot; +
+               &quot;            font-size: 2.5em;\n&quot; +
+               &quot;            margin-bottom: 20px;\n&quot; +
+               &quot;            text-align: center;\n&quot; +
+               &quot;        }\n&quot; +
+               &quot;        .status {\n&quot; +
+               &quot;            background: rgba(0,0,0,0.3);\n&quot; +
+               &quot;            padding: 20px;\n&quot; +
+               &quot;            border-radius: 8px;\n&quot; +
+               &quot;            margin: 20px 0;\n&quot; +
+               &quot;        }\n&quot; +
+               &quot;        .btn {\n&quot; +
+               &quot;            background: #4CAF50;\n&quot; +
+               &quot;            color: white;\n&quot; +
+               &quot;            padding: 12px 24px;\n&quot; +
+               &quot;            border: none;\n&quot; +
+               &quot;            border-radius: 6px;\n&quot; +
+               &quot;            cursor: pointer;\n&quot; +
+               &quot;            margin: 8px;\n&quot; +
+               &quot;            font-size: 16px;\n&quot; +
+               &quot;            transition: all 0.3s ease;\n&quot; +
+               &quot;        }\n&quot; +
+               &quot;        .btn:hover {\n&quot; +
+               &quot;            background: #45a049;\n&quot; +
+               &quot;            transform: translateY(-2px);\n&quot; +
+               &quot;        }\n&quot; +
+               &quot;        .btn-secondary {\n&quot; +
+               &quot;            background: #2196F3;\n&quot; +
+               &quot;        }\n&quot; +
+               &quot;        .btn-secondary:hover {\n&quot; +
+               &quot;            background: #1976D2;\n&quot; +
+               &quot;        }\n&quot; +
+               &quot;        .feature-grid {\n&quot; +
+               &quot;            display: grid;\n&quot; +
+               &quot;            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));\n&quot; +
+               &quot;            gap: 20px;\n&quot; +
+               &quot;            margin: 30px 0;\n&quot; +
+               &quot;        }\n&quot; +
+               &quot;        .feature-card {\n&quot; +
+               &quot;            background: rgba(255,255,255,0.2);\n&quot; +
+               &quot;            padding: 20px;\n&quot; +
+               &quot;            border-radius: 10px;\n&quot; +
+               &quot;            border: 1px solid rgba(255,255,255,0.1);\n&quot; +
+               &quot;        }\n&quot; +
+               &quot;        .status-item {\n&quot; +
+               &quot;            margin: 10px 0;\n&quot; +
+               &quot;            display: flex;\n&quot; +
+               &quot;            justify-content: space-between;\n&quot; +
+               &quot;        }\n&quot; +
+               &quot;        .status-value {\n&quot; +
+               &quot;            font-weight: bold;\n&quot; +
+               &quot;            color: #4CAF50;\n&quot; +
+               &quot;        }\n&quot; +
+               &quot;        .loading {\n&quot; +
+               &quot;            color: #FFC107;\n&quot; +
+               &quot;        }\n&quot; +
+               &quot;        .error {\n&quot; +
+               &quot;            color: #F44336;\n&quot; +
+               &quot;        }\n&quot; +
+               &quot;        .success {\n&quot; +
+               &quot;            color: #4CAF50;\n&quot; +
+               &quot;        }\n&quot; +
+               &quot;        #session-info {\n&quot; +
+               &quot;            margin-top: 20px;\n&quot; +
+               &quot;            padding: 15px;\n&quot; +
+               &quot;            background: rgba(0,0,0,0.2);\n&quot; +
+               &quot;            border-radius: 8px;\n&quot; +
+               &quot;        }\n&quot; +
+               &quot;    &lt;/style&gt;\n&quot; +
+               &quot;&lt;/head&gt;\n&quot; +
+               &quot;&lt;body&gt;\n&quot; +
+               &quot;    &lt;div class=\&quot;container\&quot;&gt;\n&quot; +
+               &quot;        &lt;h1&gt;🏃‍♀️ FitnessAI Java Backend&lt;/h1&gt;\n&quot; +
+               &quot;        &lt;p style=\&quot;text-align: center; font-size: 1.2em; margin-bottom: 30px;\&quot;&gt;\n&quot; +
+               &quot;            智能健身辅助系统 - 基于Java Spring Boot的后端API服务\n&quot; +
+               &quot;        &lt;/p&gt;\n&quot; +
+               &quot;\n&quot; +
+               &quot;        &lt;div class=\&quot;status\&quot;&gt;\n&quot; +
+               &quot;            &lt;h3&gt;📊 系统状态&lt;/h3&gt;\n&quot; +
+               &quot;            &lt;div class=\&quot;status-item\&quot;&gt;\n&quot; +
+               &quot;                &lt;span&gt;API状态:&lt;/span&gt;\n&quot; +
+               &quot;                &lt;span id=\&quot;api-status\&quot; class=\&quot;loading\&quot;&gt;检查中...&lt;/span&gt;\n&quot; +
+               &quot;            &lt;/div&gt;\n&quot; +
+               &quot;            &lt;div class=\&quot;status-item\&quot;&gt;\n&quot; +
+               &quot;                &lt;span&gt;健康状态:&lt;/span&gt;\n&quot; +
+               &quot;                &lt;span id=\&quot;health-status\&quot; class=\&quot;loading\&quot;&gt;检查中...&lt;/span&gt;\n&quot; +
+               &quot;            &lt;/div&gt;\n&quot; +
+               &quot;            &lt;div class=\&quot;status-item\&quot;&gt;\n&quot; +
+               &quot;                &lt;span&gt;支持的运动:&lt;/span&gt;\n&quot; +
+               &quot;                &lt;span id=\&quot;exercises\&quot; class=\&quot;loading\&quot;&gt;加载中...&lt;/span&gt;\n&quot; +
+               &quot;            &lt;/div&gt;\n&quot; +
+               &quot;            &lt;div class=\&quot;status-item\&quot;&gt;\n&quot; +
+               &quot;                &lt;span&gt;Java版本:&lt;/span&gt;\n&quot; +
+               &quot;                &lt;span id=\&quot;java-version\&quot; class=\&quot;loading\&quot;&gt;检查中...&lt;/span&gt;\n&quot; +
+               &quot;            &lt;/div&gt;\n&quot; +
+               &quot;        &lt;/div&gt;\n&quot; +
+               &quot;\n&quot; +
+               &quot;        &lt;div class=\&quot;feature-grid\&quot;&gt;\n&quot; +
+               &quot;            &lt;div class=\&quot;feature-card\&quot;&gt;\n&quot; +
+               &quot;                &lt;h3&gt;🎯 开始训练&lt;/h3&gt;\n&quot; +
+               &quot;                &lt;button class=\&quot;btn\&quot; onclick=\&quot;startSession('squat')\&quot;&gt;开始深蹲训练&lt;/button&gt;\n&quot; +
+               &quot;                &lt;button class=\&quot;btn\&quot; onclick=\&quot;startSession('pushup')\&quot;&gt;开始俯卧撑训练&lt;/button&gt;\n&quot; +
+               &quot;                &lt;button class=\&quot;btn\&quot; onclick=\&quot;startSession('plank')\&quot;&gt;开始平板支撑训练&lt;/button&gt;\n&quot; +
+               &quot;                &lt;button class=\&quot;btn\&quot; onclick=\&quot;startSession('jumping_jack')\&quot;&gt;开始开合跳训练&lt;/button&gt;\n&quot; +
+               &quot;                &lt;div id=\&quot;session-info\&quot;&gt;&lt;/div&gt;\n&quot; +
+               &quot;            &lt;/div&gt;\n&quot; +
+               &quot;\n&quot; +
+               &quot;            &lt;div class=\&quot;feature-card\&quot;&gt;\n&quot; +
+               &quot;                &lt;h3&gt;📋 API测试&lt;/h3&gt;\n&quot; +
+               &quot;                &lt;button class=\&quot;btn btn-secondary\&quot; onclick=\&quot;testAPI('/api')\&quot;&gt;测试API状态&lt;/button&gt;\n&quot; +
+               &quot;                &lt;button class=\&quot;btn btn-secondary\&quot; onclick=\&quot;testAPI('/api/health')\&quot;&gt;测试健康检查&lt;/button&gt;\n&quot; +
+               &quot;                &lt;button class=\&quot;btn btn-secondary\&quot; onclick=\&quot;testAPI('/api/exercises')\&quot;&gt;获取运动类型&lt;/button&gt;\n&quot; +
+               &quot;                &lt;button class=\&quot;btn btn-secondary\&quot; onclick=\&quot;testAPI('/api/system')\&quot;&gt;获取系统信息&lt;/button&gt;\n&quot; +
+               &quot;            &lt;/div&gt;\n&quot; +
+               &quot;        &lt;/div&gt;\n&quot; +
+               &quot;\n&quot; +
+               &quot;        &lt;div class=\&quot;feature-card\&quot;&gt;\n&quot; +
+               &quot;            &lt;h3&gt;💡 技术特色&lt;/h3&gt;\n&quot; +
+               &quot;            &lt;ul style=\&quot;list-style: none; padding: 0;\&quot;&gt;\n&quot; +
+               &quot;                &lt;li&gt;🔧 &lt;strong&gt;Spring Boot 3.2&lt;/strong&gt; - 现代化Java框架&lt;/li&gt;\n&quot; +
+               &quot;                &lt;li&gt;🗄️ &lt;strong&gt;H2 Database&lt;/strong&gt; - 内存数据库支持&lt;/li&gt;\n&quot; +
+               &quot;                &lt;li&gt;🧮 &lt;strong&gt;Apache Commons Math&lt;/strong&gt; - 数学计算库&lt;/li&gt;\n&quot; +
+               &quot;                &lt;li&gt;📐 &lt;strong&gt;实时姿势分析&lt;/strong&gt; - 四种运动类型支持&lt;/li&gt;\n&quot; +
+               &quot;                &lt;li&gt;🔄 &lt;strong&gt;会话管理&lt;/strong&gt; - 完整的训练流程跟踪&lt;/li&gt;\n&quot; +
+               &quot;                &lt;li&gt;📊 &lt;strong&gt;数据统计&lt;/strong&gt; - 详细的训练数据分析&lt;/li&gt;\n&quot; +
+               &quot;            &lt;/ul&gt;\n&quot; +
+               &quot;        &lt;/div&gt;\n&quot; +
+               &quot;    &lt;/div&gt;\n&quot; +
+               &quot;\n&quot; +
+               &quot;    &lt;script&gt;\n&quot; +
+               &quot;        // 检查API状态\n&quot; +
+               &quot;        fetch('/api')\n&quot; +
+               &quot;            .then(r =&gt; r.json())\n&quot; +
+               &quot;            .then(data =&gt; {\n&quot; +
+               &quot;                document.getElementById('api-status').textContent = '✅ ' + data.status;\n&quot; +
+               &quot;                document.getElementById('api-status').className = 'status-value success';\n&quot; +
+               &quot;                document.getElementById('java-version').textContent = data.java_version;\n&quot; +
+               &quot;                document.getElementById('java-version').className = 'status-value';\n&quot; +
+               &quot;            })\n&quot; +
+               &quot;            .catch(e =&gt; {\n&quot; +
+               &quot;                document.getElementById('api-status').textContent = '❌ 离线';\n&quot; +
+               &quot;                document.getElementById('api-status').className = 'status-value error';\n&quot; +
+               &quot;            });\n&quot; +
+               &quot;\n&quot; +
+               &quot;        // 检查健康状态\n&quot; +
+               &quot;        fetch('/api/health')\n&quot; +
+               &quot;            .then(r =&gt; r.json())\n&quot; +
+               &quot;            .then(data =&gt; {\n&quot; +
+               &quot;                document.getElementById('health-status').textContent = '✅ ' + data.status;\n&quot; +
+               &quot;                document.getElementById('health-status').className = 'status-value success';\n&quot; +
+               &quot;            })\n&quot; +
+               &quot;            .catch(e =&gt; {\n&quot; +
+               &quot;                document.getElementById('health-status').textContent = '❌ 异常';\n&quot; +
+               &quot;                document.getElementById('health-status').className = 'status-value error';\n&quot; +
+               &quot;            });\n&quot; +
+               &quot;\n&quot; +
+               &quot;        // 获取运动类型\n&quot; +
+               &quot;        fetch('/api/exercises')\n&quot; +
+               &quot;            .then(r =&gt; r.json())\n&quot; +
+               &quot;            .then(data =&gt; {\n&quot; +
+               &quot;                const names = data.map(ex =&gt; ex.name).join(', ');\n&quot; +
+               &quot;                document.getElementById('exercises').textContent = names;\n&quot; +
+               &quot;                document.getElementById('exercises').className = 'status-value';\n&quot; +
+               &quot;            })\n&quot; +
+               &quot;            .catch(e =&gt; {\n&quot; +
+               &quot;                document.getElementById('exercises').textContent = '加载失败';\n&quot; +
+               &quot;                document.getElementById('exercises').className = 'status-value error';\n&quot; +
+               &quot;            });\n&quot; +
+               &quot;\n&quot; +
+               &quot;        // 开始训练会话\n&quot; +
+               &quot;        function startSession(exerciseType) {\n&quot; +
+               &quot;            const requestData = {\n&quot; +
+               &quot;                exercise_type: exerciseType,\n&quot; +
+               &quot;                user_id: 'demo_user'\n&quot; +
+               &quot;            };\n&quot; +
+               &quot;\n&quot; +
+               &quot;            fetch('/api/session/start', {\n&quot; +
+               &quot;                method: 'POST',\n&quot; +
+               &quot;                headers: {'Content-Type': 'application/json'},\n&quot; +
+               &quot;                body: JSON.stringify(requestData)\n&quot; +
+               &quot;            })\n&quot; +
+               &quot;            .then(r =&gt; r.json())\n&quot; +
+               &quot;            .then(data =&gt; {\n&quot; +
+               &quot;                if (data.session_id) {\n&quot; +
+               &quot;                    document.getElementById('session-info').innerHTML = \n&quot; +
+               &quot;                        '&lt;p class=\&quot;success\&quot;&gt;✅ 训练会话已创建!&lt;/p&gt;' +\n&quot; +
+               &quot;                        '&lt;p&gt;会话ID: ' + data.session_id + '&lt;/p&gt;' +\n&quot; +
+               &quot;                        '&lt;p&gt;运动类型: ' + exerciseType + '&lt;/p&gt;' +\n&quot; +
+               &quot;                        '&lt;button class=\&quot;btn\&quot; onclick=\&quot;endSession(\\'' + data.session_id + '\\')\&quot;&gt;结束会话&lt;/button&gt;';\n&quot; +
+               &quot;                } else {\n&quot; +
+               &quot;                    document.getElementById('session-info').innerHTML = \n&quot; +
+               &quot;                        '&lt;p class=\&quot;error\&quot;&gt;❌ 启动失败: ' + (data.error || '未知错误') + '&lt;/p&gt;';\n&quot; +
+               &quot;                }\n&quot; +
+               &quot;            })\n&quot; +
+               &quot;            .catch(e =&gt; {\n&quot; +
+               &quot;                document.getElementById('session-info').innerHTML = \n&quot; +
+               &quot;                    '&lt;p class=\&quot;error\&quot;&gt;❌ 启动失败: ' + e.message + '&lt;/p&gt;';\n&quot; +
+               &quot;            });\n&quot; +
+               &quot;        }\n&quot; +
+               &quot;\n&quot; +
+               &quot;        // 结束训练会话\n&quot; +
+               &quot;        function endSession(sessionId) {\n&quot; +
+               &quot;            fetch('/api/session/' + sessionId + '/end', {\n&quot; +
+               &quot;                method: 'POST'\n&quot; +
+               &quot;            })\n&quot; +
+               &quot;            .then(r =&gt; r.json())\n&quot; +
+               &quot;            .then(data =&gt; {\n&quot; +
+               &quot;                if (data.summary) {\n&quot; +
+               &quot;                    const summary = data.summary;\n&quot; +
+               &quot;                    document.getElementById('session-info').innerHTML = \n&quot; +
+               &quot;                        '&lt;p class=\&quot;success\&quot;&gt;✅ 会话已结束!&lt;/p&gt;' +\n&quot; +
+               &quot;                        '&lt;p&gt;总次数: ' + summary.total_count + '&lt;/p&gt;' +\n&quot; +
+               &quot;                        '&lt;p&gt;正确次数: ' + summary.correct_count + '&lt;/p&gt;' +\n&quot; +
+               &quot;                        '&lt;p&gt;准确率: ' + (summary.accuracy * 100).toFixed(1) + '%&lt;/p&gt;';\n&quot; +
+               &quot;                } else {\n&quot; +
+               &quot;                    document.getElementById('session-info').innerHTML = \n&quot; +
+               &quot;                        '&lt;p class=\&quot;error\&quot;&gt;❌ 结束失败: ' + (data.error || '未知错误') + '&lt;/p&gt;';\n&quot; +
+               &quot;                }\n&quot; +
+               &quot;            })\n&quot; +
+               &quot;            .catch(e =&gt; {\n&quot; +
+               &quot;                document.getElementById('session-info').innerHTML = \n&quot; +
+               &quot;                    '&lt;p class=\&quot;error\&quot;&gt;❌ 结束失败: ' + e.message + '&lt;/p&gt;';\n&quot; +
+               &quot;            });\n&quot; +
+               &quot;        }\n&quot; +
+               &quot;\n&quot; +
+               &quot;        // 测试API接口\n&quot; +
+               &quot;        function testAPI(endpoint) {\n&quot; +
+               &quot;            fetch(endpoint)\n&quot; +
+               &quot;                .then(r =&gt; r.json())\n&quot; +
+               &quot;                .then(data =&gt; {\n&quot; +
+               &quot;                    alert('API测试成功!\\n\\n接口: ' + endpoint + '\\n\\n响应: ' + JSON.stringify(data, null, 2));\n&quot; +
+               &quot;                })\n&quot; +
+               &quot;                .catch(e =&gt; {\n&quot; +
+               &quot;                    alert('API测试失败: ' + e.message);\n&quot; +
+               &quot;                });\n&quot; +
+               &quot;        }\n&quot; +
+               &quot;    &lt;/script&gt;\n&quot; +
+               &quot;&lt;/body&gt;\n&quot; +
+               &quot;&lt;/html&gt;&quot;;
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

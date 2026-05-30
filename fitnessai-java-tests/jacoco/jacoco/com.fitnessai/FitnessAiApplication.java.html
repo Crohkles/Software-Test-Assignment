@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FitnessAiApplication.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">FitnessAI Backend</a> &gt; <a href="index.source.html" class="el_package">com.fitnessai</a> &gt; <span class="el_source">FitnessAiApplication.java</span></div><h1>FitnessAiApplication.java</h1><pre class="source lang-java linenums">package com.fitnessai;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.web.bind.annotation.CrossOrigin;
+
+import java.util.TimeZone;
+
+/**
+ * FitnessAI 主应用程序类
+ *
+ * 这是Spring Boot应用程序的入口点。
+ * 提供RESTful API服务，支持实时姿势分析和运动计数。
+ *
+ * @author FitnessAI Team
+ * @version 1.0.0
+ */
+@SpringBootApplication
+@CrossOrigin(origins = &quot;*&quot;, maxAge = 3600)
+<span class="fc" id="L20">public class FitnessAiApplication {</span>
+
+    public static void main(String[] args) {
+        // 设置时区为北京时间 (UTC+8)
+<span class="nc" id="L24">        TimeZone.setDefault(TimeZone.getTimeZone(&quot;Asia/Shanghai&quot;));</span>
+        
+<span class="nc" id="L26">        SpringApplication.run(FitnessAiApplication.class, args);</span>
+<span class="nc" id="L27">        System.out.println(&quot;启动FitnessAI Java后端服务...&quot;);</span>
+<span class="nc" id="L28">        System.out.println(&quot;API服务: http://localhost:8080&quot;);</span>
+<span class="nc" id="L29">        System.out.println(&quot;健康检查: http://localhost:8080/api&quot;);</span>
+<span class="nc" id="L30">        System.out.println(&quot;时区设置: Asia/Shanghai (UTC+8)&quot;);</span>
+<span class="nc" id="L31">        System.out.println(&quot;FitnessAI - 智能健身辅助系统&quot;);</span>
+
+<span class="nc" id="L33">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

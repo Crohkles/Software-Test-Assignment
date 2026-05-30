@@ -1,0 +1,199 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PoseAnalyzer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">FitnessAI Backend</a> &gt; <a href="index.source.html" class="el_package">com.fitnessai.analyzer</a> &gt; <span class="el_source">PoseAnalyzer.java</span></div><h1>PoseAnalyzer.java</h1><pre class="source lang-java linenums">package com.fitnessai.analyzer;
+
+import com.fitnessai.model.PoseLandmark;
+import com.fitnessai.dto.PoseAnalysisResponse;
+import com.fitnessai.model.ExerciseType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.List;
+
+/**
+ * 姿势分析器基类
+ *
+ * 提供基础的姿势分析功能和工具方法
+ */
+<span class="fc" id="L16">public abstract class PoseAnalyzer {</span>
+
+<span class="fc" id="L18">    protected static final Logger logger = LoggerFactory.getLogger(PoseAnalyzer.class);</span>
+
+    // 配置参数
+    protected static final double MIN_DETECTION_CONFIDENCE = 0.5;
+    protected static final int MIN_STABLE_FRAMES = 3;
+    protected static final int COOLDOWN_FRAMES = 10;
+
+    // 状态跟踪变量
+<span class="fc" id="L26">    protected int stateChangedFrames = 0;</span>
+<span class="fc" id="L27">    protected int cooldownCounter = 0;</span>
+<span class="fc" id="L28">    protected String lastState = &quot;&quot;;</span>
+
+    /**
+     * 分析姿势
+     *
+     * @param landmarks MediaPipe姿态关键点
+     * @return 分析结果
+     */
+    public abstract PoseAnalysisResponse analyze(List&lt;PoseLandmark&gt; landmarks);
+
+    /**
+     * 获取运动类型
+     *
+     * @return 运动类型
+     */
+    public abstract ExerciseType getExerciseType();
+
+    /**
+     * 重置分析器状态
+     */
+    public void reset() {
+<span class="fc" id="L49">        stateChangedFrames = 0;</span>
+<span class="fc" id="L50">        cooldownCounter = 0;</span>
+<span class="fc" id="L51">        lastState = &quot;&quot;;</span>
+<span class="fc" id="L52">        logger.info(&quot;✅ 重置分析器状态: {}&quot;, getExerciseType());</span>
+<span class="fc" id="L53">    }</span>
+
+    /**
+     * 检查关键点是否可见
+     *
+     * @param landmarks 姿态关键点
+     * @param requiredLandmarks 需要检查的关键点索引
+     * @return 是否可见
+     */
+    protected boolean isPoseVisible(List&lt;PoseLandmark&gt; landmarks, int[] requiredLandmarks) {
+<span class="pc bpc" id="L63" title="2 of 4 branches missed.">        if (landmarks == null || landmarks.size() &lt; 33) {</span>
+<span class="nc" id="L64">            return false;</span>
+        }
+
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">        if (requiredLandmarks == null) {</span>
+            // 默认检查上半身关键点
+<span class="nc" id="L69">            requiredLandmarks = new int[]{11, 12, 13, 14}; // 左肩, 右肩, 左肘, 右肘</span>
+        }
+
+<span class="fc bfc" id="L72" title="All 2 branches covered.">        for (int idx : requiredLandmarks) {</span>
+<span class="pc bpc" id="L73" title="2 of 4 branches missed.">            if (idx &gt;= landmarks.size() || !landmarks.get(idx).isVisible(MIN_DETECTION_CONFIDENCE)) {</span>
+<span class="nc" id="L74">                return false;</span>
+            }
+        }
+
+<span class="fc" id="L78">        return true;</span>
+    }
+
+    /**
+     * 计算三个点形成的角度
+     *
+     * @param a 点A
+     * @param b 点B（顶点）
+     * @param c 点C
+     * @return 角度（度）
+     */
+    protected double calculateAngle(PoseLandmark a, PoseLandmark b, PoseLandmark c) {
+<span class="pc bpc" id="L90" title="3 of 6 branches missed.">        if (a == null || b == null || c == null) {</span>
+<span class="nc" id="L91">            return 180.0;</span>
+        }
+
+        // 计算向量
+<span class="fc" id="L95">        double baX = a.getX() - b.getX();</span>
+<span class="fc" id="L96">        double baY = a.getY() - b.getY();</span>
+<span class="fc" id="L97">        double bcX = c.getX() - b.getX();</span>
+<span class="fc" id="L98">        double bcY = c.getY() - b.getY();</span>
+
+        // 计算点积
+<span class="fc" id="L101">        double dotProduct = baX * bcX + baY * bcY;</span>
+
+        // 计算向量长度
+<span class="fc" id="L104">        double baLength = Math.sqrt(baX * baX + baY * baY);</span>
+<span class="fc" id="L105">        double bcLength = Math.sqrt(bcX * bcX + bcY * bcY);</span>
+
+        // 计算夹角（弧度）
+        try {
+<span class="fc" id="L109">            double cosAngle = dotProduct / (baLength * bcLength);</span>
+            // 防止浮点数计算导致的越界
+<span class="fc" id="L111">            cosAngle = Math.max(Math.min(cosAngle, 1.0), -1.0);</span>
+<span class="fc" id="L112">            double angleRad = Math.acos(cosAngle);</span>
+
+            // 转换为角度
+<span class="fc" id="L115">            return Math.toDegrees(angleRad);</span>
+<span class="nc" id="L116">        } catch (Exception e) {</span>
+<span class="nc" id="L117">            return 180.0; // 如果计算出错，返回180度</span>
+        }
+    }
+
+    /**
+     * 计算两点之间的距离
+     *
+     * @param a 点A
+     * @param b 点B
+     * @return 距离
+     */
+    protected double calculateDistance(PoseLandmark a, PoseLandmark b) {
+<span class="pc bpc" id="L129" title="2 of 4 branches missed.">        if (a == null || b == null) {</span>
+<span class="nc" id="L130">            return 0.0;</span>
+        }
+
+<span class="fc" id="L133">        double dx = a.getX() - b.getX();</span>
+<span class="fc" id="L134">        double dy = a.getY() - b.getY();</span>
+<span class="fc" id="L135">        return Math.sqrt(dx * dx + dy * dy);</span>
+    }
+
+    /**
+     * 创建错误响应
+     *
+     * @param error 错误信息
+     * @param exerciseType 运动类型
+     * @return 错误响应
+     */
+    protected PoseAnalysisResponse createErrorResponse(String error, ExerciseType exerciseType) {
+<span class="nc" id="L146">        logger.warn(&quot;❌ 姿势分析错误: {}&quot;, error);</span>
+<span class="nc" id="L147">        return PoseAnalysisResponse.error(error, false, 0, &quot;分析失败，请重试&quot;, 0);</span>
+    }
+
+    /**
+     * 创建错误响应（带基本反馈）
+     *
+     * @param feedback 反馈信息
+     * @param exerciseType 运动类型
+     * @return 错误响应
+     */
+    protected PoseAnalysisResponse createBasicErrorResponse(String feedback, ExerciseType exerciseType) {
+<span class="nc" id="L158">        return PoseAnalysisResponse.error(feedback, false, 0, feedback, 0);</span>
+    }
+
+    /**
+     * 更新冷却计数器
+     */
+    protected void updateCooldown() {
+<span class="pc bpc" id="L165" title="1 of 2 branches missed.">        if (cooldownCounter &gt; 0) {</span>
+<span class="nc" id="L166">            cooldownCounter--;</span>
+        }
+<span class="fc" id="L168">    }</span>
+
+    /**
+     * 检查是否在冷却期
+     *
+     * @return 是否在冷却期
+     */
+    protected boolean isCooldownActive() {
+<span class="pc bpc" id="L176" title="1 of 2 branches missed.">        return cooldownCounter &gt; 0;</span>
+    }
+
+    /**
+     * 启动冷却
+     */
+    protected void startCooldown() {
+<span class="fc" id="L183">        cooldownCounter = COOLDOWN_FRAMES;</span>
+<span class="fc" id="L184">        logger.debug(&quot;🕒 启动冷却期: {} 帧&quot;, COOLDOWN_FRAMES);</span>
+<span class="fc" id="L185">    }</span>
+
+    /**
+     * 计算基础准确率
+     *
+     * @param totalCount 总次数
+     * @param correctCount 正确次数
+     * @return 准确率（0-1）
+     */
+    protected double calculateAccuracy(int totalCount, int correctCount) {
+<span class="fc bfc" id="L195" title="All 2 branches covered.">        if (totalCount == 0) return 0.0;</span>
+<span class="fc" id="L196">        return Math.min(1.0, (double) correctCount / totalCount);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

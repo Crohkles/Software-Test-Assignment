@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PoseAnalysisRequest.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">FitnessAI Backend</a> &gt; <a href="index.source.html" class="el_package">com.fitnessai.dto</a> &gt; <span class="el_source">PoseAnalysisRequest.java</span></div><h1>PoseAnalysisRequest.java</h1><pre class="source lang-java linenums">package com.fitnessai.dto;
+
+import com.fitnessai.model.ExerciseType;
+import com.fitnessai.model.PoseLandmark;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+import java.util.List;
+
+/**
+ * 姿势分析请求DTO
+ */
+public class PoseAnalysisRequest {
+
+    @JsonProperty(&quot;pose_landmarks&quot;)
+    private List&lt;PoseLandmark&gt; poseLandmarks;
+
+    @JsonProperty(&quot;exercise_type&quot;)
+    private ExerciseType exerciseType;
+
+    @JsonProperty(&quot;session_id&quot;)
+    private String sessionId;
+
+    // 默认构造函数
+<span class="fc" id="L24">    public PoseAnalysisRequest() {}</span>
+
+    // 完整构造函数
+<span class="fc" id="L27">    public PoseAnalysisRequest(List&lt;PoseLandmark&gt; poseLandmarks, ExerciseType exerciseType, String sessionId) {</span>
+<span class="fc" id="L28">        this.poseLandmarks = poseLandmarks;</span>
+<span class="fc bfc" id="L29" title="All 2 branches covered.">        this.exerciseType = exerciseType != null ? exerciseType : ExerciseType.SQUAT;</span>
+<span class="fc" id="L30">        this.sessionId = sessionId;</span>
+<span class="fc" id="L31">    }</span>
+
+    // Getters and Setters
+    public List&lt;PoseLandmark&gt; getPoseLandmarks() {
+<span class="fc" id="L35">        return poseLandmarks;</span>
+    }
+
+    public void setPoseLandmarks(List&lt;PoseLandmark&gt; poseLandmarks) {
+<span class="fc" id="L39">        this.poseLandmarks = poseLandmarks;</span>
+<span class="fc" id="L40">    }</span>
+
+    public ExerciseType getExerciseType() {
+<span class="fc" id="L43">        return exerciseType;</span>
+    }
+
+    public void setExerciseType(ExerciseType exerciseType) {
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">        this.exerciseType = exerciseType != null ? exerciseType : ExerciseType.SQUAT;</span>
+<span class="fc" id="L48">    }</span>
+
+    public String getSessionId() {
+<span class="fc" id="L51">        return sessionId;</span>
+    }
+
+    public void setSessionId(String sessionId) {
+<span class="fc" id="L55">        this.sessionId = sessionId;</span>
+<span class="fc" id="L56">    }</span>
+
+    /**
+     * 验证请求参数
+     */
+    public boolean isValid() {
+<span class="fc bfc" id="L62" title="All 4 branches covered.">        return poseLandmarks != null &amp;&amp; !poseLandmarks.isEmpty() &amp;&amp;</span>
+<span class="pc bpc" id="L63" title="1 of 4 branches missed.">               poseLandmarks.size() &gt;= 33 &amp;&amp; // MediaPipe Pose有33个关键点</span>
+               exerciseType != null;
+    }
+
+    @Override
+    public String toString() {
+<span class="fc" id="L69">        return String.format(&quot;PoseAnalysisRequest{exerciseType=%s, sessionId='%s', &quot; +</span>
+                           &quot;poseLandmarksCount=%d}&quot;,
+                           exerciseType, sessionId,
+<span class="fc bfc" id="L72" title="All 2 branches covered.">                           poseLandmarks != null ? poseLandmarks.size() : 0);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

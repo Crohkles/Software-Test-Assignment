@@ -1,0 +1,346 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PushupAnalyzer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">FitnessAI Backend</a> &gt; <a href="index.source.html" class="el_package">com.fitnessai.analyzer</a> &gt; <span class="el_source">PushupAnalyzer.java</span></div><h1>PushupAnalyzer.java</h1><pre class="source lang-java linenums">package com.fitnessai.analyzer;
+
+import com.fitnessai.model.PoseLandmark;
+import com.fitnessai.dto.PoseAnalysisResponse;
+import com.fitnessai.model.ExerciseType;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * 俯卧撑动作分析器
+ *
+ * 基于手臂角度检测俯卧撑动作并进行计数
+ */
+public class PushupAnalyzer extends PoseAnalyzer {
+
+    // 俯卧撑特定参数
+    private static final double ANGLE_THRESHOLD = 115.0;     // 弯曲角度阈值
+    private static final double STRAIGHT_THRESHOLD = 155.0;  // 伸直角度阈值
+    private static final int REQUIRED_FRAMES = 5;             // 确认状态所需帧数
+    private static final int COOLDOWN_FRAMES = 15;            // 冷却时间
+
+    // 状态变量
+<span class="fc" id="L25">    private int pushupCount = 0;</span>
+<span class="fc" id="L26">    private boolean inDownPosition = false;</span>
+<span class="fc" id="L27">    private int consecutiveUpFrames = 0;</span>
+<span class="fc" id="L28">    private int consecutiveDownFrames = 0;</span>
+<span class="fc" id="L29">    private double sideViewBaselineY = 0;  // 侧面视角的基线位置</span>
+<span class="fc" id="L30">    private boolean currentIsSideView = false; // 当前是否为侧面视角</span>
+
+    public PushupAnalyzer() {
+<span class="fc" id="L33">        super();</span>
+<span class="fc" id="L34">        this.cooldownCounter = 0;</span>
+<span class="fc" id="L35">        logger.info(&quot;💪 初始化俯卧撑分析器&quot;);</span>
+<span class="fc" id="L36">    }</span>
+
+    @Override
+    public ExerciseType getExerciseType() {
+<span class="nc" id="L40">        return ExerciseType.PUSHUP;</span>
+    }
+
+    @Override
+    public PoseAnalysisResponse analyze(List&lt;PoseLandmark&gt; landmarks) {
+        // 使用更宽松的可见性检查（侧面视角下某些关键点可能被遮挡）
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">        if (!isPushupPoseVisible(landmarks, new int[]{11, 12, 13, 14, 23, 24})) {</span>
+<span class="nc" id="L47">            return createBasicErrorResponse(&quot;请确保上半身在摄像头范围内&quot;, ExerciseType.PUSHUP);</span>
+        }
+
+        try {
+            // 分析俯卧撑姿势（支持正面和侧面视角）
+<span class="fc" id="L52">            PushupAnalysisResult result = analyzePushupPosition(landmarks);</span>
+<span class="fc" id="L53">            double armAngle = result.angle;</span>
+<span class="fc" id="L54">            currentIsSideView = result.isSideView;</span>
+
+            // 确定当前状态
+<span class="fc" id="L57">            String currentState = detectPushupState(armAngle);</span>
+
+            // 更新连续帧计数
+<span class="fc" id="L60">            updateFrameCounters(currentState);</span>
+
+            // 确认状态
+<span class="fc" id="L63">            String confirmedState = confirmState();</span>
+
+            // 更新计数
+<span class="fc" id="L66">            boolean countUpdated = updateCount(confirmedState);</span>
+
+            // 生成反馈
+<span class="fc" id="L69">            String feedback = generateFeedback(confirmedState);</span>
+
+            // 计算得分
+<span class="fc" id="L72">            int score = calculateScore(confirmedState, armAngle);</span>
+
+            // 计算准确率
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">            double accuracy = calculateAccuracy(pushupCount + (countUpdated ? 1 : 0), pushupCount);</span>
+
+            // 创建响应
+<span class="fc" id="L78">            PoseAnalysisResponse response = PoseAnalysisResponse.success(</span>
+                true, score, feedback, pushupCount, ExerciseType.PUSHUP, accuracy
+            );
+
+            // 添加详细信息
+<span class="fc" id="L83">            Map&lt;String, Object&gt; details = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L84">            details.put(&quot;arm_angle&quot;, Math.round(armAngle * 10.0) / 10.0);</span>
+<span class="fc" id="L85">            details.put(&quot;state&quot;, confirmedState);</span>
+<span class="fc" id="L86">            details.put(&quot;cooldown&quot;, cooldownCounter);</span>
+<span class="fc" id="L87">            response.setDetails(details);</span>
+
+<span class="fc" id="L89">            logger.debug(&quot;俯卧撑分析 - 角度: {:.1f}, 状态: {}, 计数: {}, 反馈: {}&quot;,</span>
+<span class="fc" id="L90">                        armAngle, confirmedState, pushupCount, feedback);</span>
+
+<span class="fc" id="L92">            return response;</span>
+
+<span class="nc" id="L94">        } catch (Exception e) {</span>
+<span class="nc" id="L95">            logger.error(&quot;俯卧撑分析错误: {}&quot;, e.getMessage(), e);</span>
+<span class="nc" id="L96">            return createErrorResponse(&quot;分析失败: &quot; + e.getMessage(), ExerciseType.PUSHUP);</span>
+        }
+    }
+
+    @Override
+    public void reset() {
+<span class="nc" id="L102">        super.reset();</span>
+<span class="nc" id="L103">        pushupCount = 0;</span>
+<span class="nc" id="L104">        inDownPosition = false;</span>
+<span class="nc" id="L105">        consecutiveUpFrames = 0;</span>
+<span class="nc" id="L106">        consecutiveDownFrames = 0;</span>
+<span class="nc" id="L107">        cooldownCounter = 0;</span>
+<span class="nc" id="L108">        sideViewBaselineY = 0;</span>
+<span class="nc" id="L109">        currentIsSideView = false;</span>
+<span class="nc" id="L110">        logger.info(&quot;🔄 重置俯卧撑分析器 - 计数: {}&quot;, pushupCount);</span>
+<span class="nc" id="L111">    }</span>
+
+    /**
+     * 俯卧撑专用的可见性检查（使用更宽松的阈值，适配侧面视角）
+     */
+    private static final double PUSHUP_MIN_CONFIDENCE = 0.2;  // 较低的可见性阈值
+    
+    private boolean isPushupPoseVisible(List&lt;PoseLandmark&gt; landmarks, int[] requiredLandmarks) {
+<span class="pc bpc" id="L119" title="2 of 4 branches missed.">        if (landmarks == null || landmarks.size() &lt; 33) {</span>
+<span class="nc" id="L120">            return false;</span>
+        }
+
+<span class="fc" id="L123">        int visibleCount = 0;</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">        for (int idx : requiredLandmarks) {</span>
+<span class="pc bpc" id="L125" title="2 of 4 branches missed.">            if (idx &lt; landmarks.size() &amp;&amp; landmarks.get(idx).getVisibility() &gt;= PUSHUP_MIN_CONFIDENCE) {</span>
+<span class="fc" id="L126">                visibleCount++;</span>
+            }
+        }
+
+        // 只要有一半以上的关键点可见就可以
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">        return visibleCount &gt;= requiredLandmarks.length / 2;</span>
+    }
+
+    /**
+     * 分析俯卧撑姿势（支持正面和侧面视角）
+     * @return PushupAnalysisResult 包含角度/位置信息和视角类型
+     */
+    private PushupAnalysisResult analyzePushupPosition(List&lt;PoseLandmark&gt; landmarks) {
+<span class="fc" id="L139">        PoseLandmark leftShoulder = landmarks.get(11);</span>
+<span class="fc" id="L140">        PoseLandmark rightShoulder = landmarks.get(12);</span>
+<span class="fc" id="L141">        PoseLandmark leftElbow = landmarks.get(13);</span>
+<span class="fc" id="L142">        PoseLandmark rightElbow = landmarks.get(14);</span>
+<span class="fc" id="L143">        PoseLandmark leftHip = landmarks.get(23);</span>
+<span class="fc" id="L144">        PoseLandmark rightHip = landmarks.get(24);</span>
+
+        // 判断视角：通过左右肩的X坐标差异来判断
+        // 侧面视角时，两肩的X坐标接近；正面视角时，两肩的X坐标差异较大
+<span class="fc" id="L148">        double shoulderWidthX = Math.abs(leftShoulder.getX() - rightShoulder.getX());</span>
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">        boolean isSideView = shoulderWidthX &lt; 0.15;</span>
+
+<span class="fc" id="L151">        logger.debug(&quot;俯卧撑视角检测 - 肩宽差: {:.3f}, 侧面视角: {}&quot;, shoulderWidthX, isSideView);</span>
+
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">        if (isSideView) {</span>
+            // ====== 侧面视角分析 ======
+            // 使用可见性更高的一侧进行分析
+<span class="pc bpc" id="L156" title="1 of 2 branches missed.">            boolean useLeft = leftShoulder.getVisibility() &gt; rightShoulder.getVisibility();</span>
+            
+<span class="pc bpc" id="L158" title="1 of 2 branches missed.">            PoseLandmark shoulder = useLeft ? leftShoulder : rightShoulder;</span>
+<span class="pc bpc" id="L159" title="1 of 2 branches missed.">            PoseLandmark hip = useLeft ? leftHip : rightHip;</span>
+<span class="pc bpc" id="L160" title="1 of 2 branches missed.">            PoseLandmark elbow = useLeft ? leftElbow : rightElbow;</span>
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">            PoseLandmark wrist = landmarks.get(useLeft ? 15 : 16);</span>
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">            PoseLandmark ankle = landmarks.get(useLeft ? 27 : 28);</span>
+
+            // 方法1：检测肘部弯曲角度（肩-肘-腕）
+<span class="fc" id="L165">            double elbowAngle = calculateAngle(shoulder, elbow, wrist);</span>
+            
+            // 方法2：检测肩膀和肘部的Y坐标差异
+            // 下降时，肩膀会更接近地面（Y值更大），肘部弯曲
+            // 上升时，肩膀远离地面（Y值更小），手臂伸直
+<span class="fc" id="L170">            double shoulderElbowYDiff = shoulder.getY() - elbow.getY();</span>
+            
+            // 综合判断：
+            // - 肘部角度小于100度 = 下降
+            // - 肘部角度大于150度 = 上升
+            // - 或者通过肩膀和肘部的Y差异判断
+            double virtualAngle;
+            
+            // 优先使用肘部角度（如果手腕可见）
+<span class="pc bpc" id="L179" title="1 of 2 branches missed.">            if (wrist.getVisibility() &gt;= PUSHUP_MIN_CONFIDENCE) {</span>
+<span class="fc" id="L180">                virtualAngle = elbowAngle;</span>
+<span class="fc" id="L181">                logger.debug(&quot;侧面视角分析(肘角) - 肘部角度: {:.1f}&quot;, elbowAngle);</span>
+            } else {
+                // 备用方案：使用肩膀相对肘部的位置
+                // 下降时 shoulderElbowYDiff 更大（肩膀低于肘部更多）
+                // 上升时 shoulderElbowYDiff 更小或为负（肩膀高于肘部）
+<span class="nc bnc" id="L186" title="All 2 branches missed.">                if (shoulderElbowYDiff &gt; 0.05) {</span>
+<span class="nc" id="L187">                    virtualAngle = 90.0; // 下降状态</span>
+<span class="nc bnc" id="L188" title="All 2 branches missed.">                } else if (shoulderElbowYDiff &lt; -0.02) {</span>
+<span class="nc" id="L189">                    virtualAngle = 170.0; // 上升状态</span>
+                } else {
+<span class="nc" id="L191">                    virtualAngle = 135.0; // 过渡状态</span>
+                }
+<span class="nc" id="L193">                logger.debug(&quot;侧面视角分析(Y差) - 肩肘Y差: {:.3f}, 虚拟角度: {:.1f}&quot;, </span>
+<span class="nc" id="L194">                            shoulderElbowYDiff, virtualAngle);</span>
+            }
+
+<span class="fc" id="L197">            return new PushupAnalysisResult(virtualAngle, isSideView, shoulderElbowYDiff);</span>
+        } else {
+            // ====== 正面视角分析（保持原逻辑） ======
+<span class="nc" id="L200">            List&lt;Double&gt; armAngles = new java.util.ArrayList&lt;&gt;();</span>
+
+            // 左臂角度（如果可见）
+<span class="nc bnc" id="L203" title="All 2 branches missed.">            if (landmarks.get(15).isVisible(MIN_DETECTION_CONFIDENCE)) {</span>
+<span class="nc" id="L204">                double leftArmAngle = calculateAngle(landmarks.get(11), landmarks.get(13), landmarks.get(15));</span>
+<span class="nc" id="L205">                armAngles.add(leftArmAngle);</span>
+            }
+
+            // 右臂角度（如果可见）
+<span class="nc bnc" id="L209" title="All 2 branches missed.">            if (landmarks.get(16).isVisible(MIN_DETECTION_CONFIDENCE)) {</span>
+<span class="nc" id="L210">                double rightArmAngle = calculateAngle(landmarks.get(12), landmarks.get(14), landmarks.get(16));</span>
+<span class="nc" id="L211">                armAngles.add(rightArmAngle);</span>
+            }
+
+            // 计算平均角度
+<span class="nc" id="L215">            double avgAngle = 180.0;</span>
+<span class="nc bnc" id="L216" title="All 2 branches missed.">            if (!armAngles.isEmpty()) {</span>
+<span class="nc" id="L217">                avgAngle = armAngles.stream().mapToDouble(Double::doubleValue).average().orElse(180.0);</span>
+            }
+
+<span class="nc" id="L220">            return new PushupAnalysisResult(avgAngle, isSideView, 0);</span>
+        }
+    }
+
+    /**
+     * 俯卧撑分析结果内部类
+     */
+    private static class PushupAnalysisResult {
+        double angle;           // 正面视角：实际手臂角度；侧面视角：虚拟角度
+        boolean isSideView;     // 是否为侧面视角
+        double relativePosition; // 侧面视角：相对位置
+
+<span class="fc" id="L232">        PushupAnalysisResult(double angle, boolean isSideView, double relativePosition) {</span>
+<span class="fc" id="L233">            this.angle = angle;</span>
+<span class="fc" id="L234">            this.isSideView = isSideView;</span>
+<span class="fc" id="L235">            this.relativePosition = relativePosition;</span>
+<span class="fc" id="L236">        }</span>
+    }
+
+    /**
+     * 检测俯卧撑状态
+     */
+    private String detectPushupState(double armAngle) {
+<span class="pc bpc" id="L243" title="1 of 2 branches missed.">        if (armAngle &lt; ANGLE_THRESHOLD) {</span>
+<span class="nc" id="L244">            return &quot;down&quot;;</span>
+<span class="pc bpc" id="L245" title="1 of 2 branches missed.">        } else if (armAngle &gt; STRAIGHT_THRESHOLD) {</span>
+<span class="nc" id="L246">            return &quot;up&quot;;</span>
+        } else {
+            // 在过渡区域，保持上一个状态，防止抖动
+<span class="fc" id="L249">            return lastState;</span>
+        }
+    }
+
+    /**
+     * 更新帧计数器
+     */
+    private void updateFrameCounters(String currentState) {
+<span class="pc bpc" id="L257" title="1 of 2 branches missed.">        if (currentState.equals(&quot;up&quot;)) {</span>
+<span class="nc" id="L258">            consecutiveUpFrames++;</span>
+<span class="nc" id="L259">            consecutiveDownFrames = 0;</span>
+<span class="pc bpc" id="L260" title="1 of 2 branches missed.">        } else if (currentState.equals(&quot;down&quot;)) {</span>
+<span class="nc" id="L261">            consecutiveDownFrames++;</span>
+<span class="nc" id="L262">            consecutiveUpFrames = 0;</span>
+        }
+<span class="fc" id="L264">    }</span>
+
+    /**
+     * 确认状态
+     */
+    private String confirmState() {
+<span class="pc bpc" id="L270" title="1 of 2 branches missed.">        if (consecutiveUpFrames &gt;= REQUIRED_FRAMES) {</span>
+<span class="nc" id="L271">            return &quot;up&quot;;</span>
+<span class="pc bpc" id="L272" title="1 of 2 branches missed.">        } else if (consecutiveDownFrames &gt;= REQUIRED_FRAMES) {</span>
+<span class="nc" id="L273">            return &quot;down&quot;;</span>
+        }
+<span class="fc" id="L275">        return lastState;</span>
+    }
+
+    /**
+     * 更新计数
+     */
+    private boolean updateCount(String currentState) {
+<span class="pc bpc" id="L282" title="1 of 2 branches missed.">        if (cooldownCounter &gt; 0) {</span>
+<span class="nc" id="L283">            cooldownCounter--;</span>
+        }
+
+<span class="pc bpc" id="L286" title="1 of 2 branches missed.">        if (currentState != lastState) {</span>
+<span class="nc bnc" id="L287" title="All 2 branches missed.">            if (stateChangedFrames &gt;= 3) {</span>
+<span class="nc bnc" id="L288" title="All 6 branches missed.">                if (!lastState.equals(&quot;down&quot;) &amp;&amp; currentState.equals(&quot;down&quot;) &amp;&amp; cooldownCounter == 0) {</span>
+<span class="nc" id="L289">                    inDownPosition = true;</span>
+<span class="nc" id="L290">                    logger.debug(&quot;👇 检测到俯卧撑下降&quot;);</span>
+<span class="nc bnc" id="L291" title="All 6 branches missed.">                } else if (lastState.equals(&quot;down&quot;) &amp;&amp; currentState.equals(&quot;up&quot;) &amp;&amp; inDownPosition) {</span>
+<span class="nc bnc" id="L292" title="All 2 branches missed.">                    if (cooldownCounter == 0) {</span>
+<span class="nc" id="L293">                        pushupCount++;</span>
+<span class="nc" id="L294">                        cooldownCounter = COOLDOWN_FRAMES;</span>
+<span class="nc" id="L295">                        logger.info(&quot;✅ 俯卧撑计数增加: {}&quot;, pushupCount);</span>
+<span class="nc" id="L296">                        return true;</span>
+                    }
+<span class="nc" id="L298">                    inDownPosition = false;</span>
+                }
+<span class="nc" id="L300">                stateChangedFrames = 0;</span>
+            } else {
+<span class="nc" id="L302">                logger.debug(&quot;🔄 俯卧撑状态变化不稳定: {} -&gt; {}&quot;, lastState, currentState);</span>
+            }
+        } else {
+<span class="fc" id="L305">            stateChangedFrames++;</span>
+        }
+
+<span class="fc" id="L308">        lastState = currentState;</span>
+<span class="fc" id="L309">        return false;</span>
+    }
+
+    /**
+     * 生成反馈
+     */
+    private String generateFeedback(String confirmedState) {
+<span class="pc bpc" id="L316" title="1 of 2 branches missed.">        if (currentIsSideView) {</span>
+            // 侧面视角的反馈
+<span class="pc bpc" id="L318" title="1 of 2 branches missed.">            if (confirmedState.equals(&quot;down&quot;)) {</span>
+<span class="nc" id="L319">                return &quot;身体已下降，请推起身体&quot;;</span>
+            } else {
+<span class="fc" id="L321">                return &quot;保持身体挺直，准备下降&quot;;</span>
+            }
+        } else {
+            // 正面视角的反馈
+<span class="nc bnc" id="L325" title="All 2 branches missed.">            if (confirmedState.equals(&quot;down&quot;)) {</span>
+<span class="nc" id="L326">                return &quot;已下降，请向上推起&quot;;</span>
+            } else {
+<span class="nc" id="L328">                return &quot;已上升，请下降&quot;;</span>
+            }
+        }
+    }
+
+    /**
+     * 计算得分
+     */
+    private int calculateScore(String confirmedState, double armAngle) {
+<span class="pc bpc" id="L337" title="1 of 2 branches missed.">        if (confirmedState.equals(&quot;down&quot;)) {</span>
+            // 下降越深，得分越高
+<span class="nc" id="L339">            return (int)Math.max(60, 100 - Math.max(0, armAngle - 90));</span>
+        } else {
+            // 手臂越直，得分越高
+<span class="fc" id="L342">            return (int)Math.min(100, Math.max(60, armAngle));</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>
