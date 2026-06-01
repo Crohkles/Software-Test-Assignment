@@ -1,172 +1,172 @@
-# AutoTestDesign — AI 驱动测试设计工具
+# AutoTestDesign — AI-Driven Test Design Tool
 
-面向 **Software Testing Assignment 2** 的全栈 AutoTestDesign 实现：在 **generation_pipeline**（Map-Reduce / 多 Worker）与可选 LLM 增强下，完成需求解析、风险分析（QRA）、黑盒/白盒测试设计、测试预言、套件优化与多格式导出，并以 **FitnessAI**（智能健身辅助系统）作为目标应用验证工具有效性。
+Full-stack AutoTestDesign implementation for **Software Testing Assignment 2**: requirement parsing, risk analysis (QRA), black-box/white-box test design, test oracles, suite optimization, and multi-format export under **generation_pipeline** (Map-Reduce / multi-Worker) with optional LLM enhancement, validated against the target application **FitnessAI** (intelligent fitness assistant system).
 
-| 元数据 | 值 |
+| Metadata | Value |
 | --- | --- |
-| 生成管线 | `generation-pipeline-v1`（`run_generation_pipeline`） |
-| 规则引擎版本 | `autotestdesign-engine-v3`（生成响应 `engineMetadata`） |
-| Prompt 版本 | `autotestdesign-v6-fr-complete` |
-| 目标应用 | FitnessAI |
+| Generation Pipeline | `generation-pipeline-v1` (`run_generation_pipeline`) |
+| Rule Engine Version | `autotestdesign-engine-v3` (generation response `engineMetadata`) |
+| Prompt Version | `autotestdesign-v6-fr-complete` |
+| Target Application | FitnessAI |
 
 ---
 
-## 目录
+## Table of Contents
 
-1. [项目简介](#1-项目简介)
-2. [系统架构与生成管线](#2-系统架构与生成管线)
-3. [功能与 Assignment2 符合性](#3-功能与-assignment2-符合性)
-4. [仓库结构](#4-仓库结构)
-5. [环境准备](#5-环境准备)
-6. [快速启动](#6-快速启动)
-7. [使用指南（QRA → 黑盒 → 白盒 → 汇总）](#7-使用指南qra--黑盒--白盒--汇总)
-8. [FitnessAI Prompt 示例](#8-fitnessai-prompt-示例)
-9. [API 参考](#9-api-参考)
-10. [引擎与 Worker 模块](#10-引擎与-worker-模块)
-11. [导出与历史](#11-导出与历史)
-12. [测试与验证](#12-测试与验证)
-14. [相关文档](#14-相关文档)
+1. [Project Overview](#1-project-overview)
+2. [System Architecture and Generation Pipeline](#2-system-architecture-and-generation-pipeline)
+3. [Features and Assignment 2 Compliance](#3-features-and-assignment-2-compliance)
+4. [Repository Structure](#4-repository-structure)
+5. [Environment Setup](#5-environment-setup)
+6. [Quick Start](#6-quick-start)
+7. [User Guide (QRA → Black-Box → White-Box → Summary)](#7-user-guide-qra--black-box--white-box--summary)
+8. [FitnessAI Prompt Examples](#8-fitnessai-prompt-examples)
+9. [API Reference](#9-api-reference)
+10. [Engine and Worker Modules](#10-engine-and-worker-modules)
+11. [Export and History](#11-export-and-history)
+12. [Testing and Verification](#12-testing-and-verification)
+14. [Related Documentation](#14-related-documentation)
 
 ---
 
-## 1. 项目简介
+## 1. Project Overview
 
-### 1.1 做什么
+### 1.1 What It Does
 
-本仓库实现的是 **AutoTestDesign 工具本身**（被测对象不是本工具）。推荐工作流对齐 ISTQB / ISO/IEC/IEEE 29119-4 思路：
+This repository implements **the AutoTestDesign tool itself** (the system under test is not this tool). The recommended workflow aligns with ISTQB / ISO/IEC/IEEE 29119-4 thinking:
 
 ```
-多源需求输入 → QRA（结构化需求 + 风险评分）→ 按技术独立生成黑盒/白盒用例
-    → 结果汇总与交互审查 → 测试预言 / 套件优化（可选）→ JSON / CSV / Markdown / Excel 导出
+Multi-source requirement input → QRA (structured requirements + risk scoring) → Independent black-box/white-box case generation by technique
+    → Result aggregation and interactive review → Test oracle / suite optimization (optional) → JSON / CSV / Markdown / Excel export
 ```
 
-生成结果可写入 PostgreSQL，支持历史回看、实验指标统计与答辩演示。
+Generation results can be persisted to PostgreSQL, supporting history review, experiment metrics, and demo presentations.
 
-### 1.2 测谁（目标应用）
+### 1.2 What to Test (Target Application)
 
-**FitnessAI** 为固定目标应用，核心范围包括：
+**FitnessAI** is the fixed target application. Core scope includes:
 
-| 模块 | 测试关注点 |
+| Module | Testing Focus |
 | --- | --- |
-| 姿态分析 `POST /api/analytics/pose` | `exerciseType` 等价类；MediaPipe `landmarks` 32/33/34 边界 |
-| 状态机计数 | UP → DESCENDING → DOWN → ASCENDING → UP 完整循环；非法短循环不计数 |
-| 训练记录过滤 | `count < 3` 且 `durationSeconds < 30` 不入库 |
-| 训练计划 | 难度、组数、休息、`skipRest` 组合 |
-| 仪表盘 | 趋势、分布、卡路里（MET × 体重 × 时长） |
+| Pose analysis `POST /api/analytics/pose` | `exerciseType` equivalence classes; MediaPipe `landmarks` 32/33/34 boundaries |
+| State machine counting | UP → DESCENDING → DOWN → ASCENDING → UP full cycle; illegal short cycles do not count |
+| Workout record filtering | Records with `count < 3` AND `durationSeconds < 30` are not persisted |
+| Training plans | Difficulty, sets, rest, `skipRest` combinations |
+| Dashboard | Trends, distribution, calories (MET × weight × duration) |
 
-导入 Markdown 或点击前端 **填入示例** 即可快速演示。
+Import Markdown or click **Load Sample** in the frontend for a quick demo.
 
-### 1.3 设计原则
+### 1.3 Design Principles
 
-- **Worker 可独立调度**：黑盒 5 种技术、白盒 `WhiteBoxJava`、Oracle、Optimization 通过 `selectedTechniques` 按需激活。
-- **确定性优先**：黑盒 LLM 不可用时降级到 `blackbox_fallbacks.py`；白盒 CFG、coverage item、path 由 Java 分析器确定性产出。
-- **白盒 LLM 边界**：`whitebox_llm_enhancer.py` 仅增强自然语言标题、输入/前置/oracle 建议与审查问题，**不得**修改 CFG、coverageItems、coverageTargets、path。
-- **可审查**：QRA 风险、覆盖项、策略、用例、白盒 coverage 勾选与 manual item 均可编辑后保存/应用。
-- **可追踪**：`engineMetadata`、`timingMetrics`、`pipelineVersion` 随响应与历史记录保存。
+- **Workers independently schedulable**: Black-box 5 techniques, white-box `WhiteBoxJava`, Oracle, Optimization activated on demand via `selectedTechniques`.
+- **Determinism first**: When black-box LLM is unavailable, fallback to `blackbox_fallbacks.py`; white-box CFG, coverage items, and paths are produced deterministically by the Java analyzer.
+- **White-box LLM boundary**: `whitebox_llm_enhancer.py` only enhances natural-language titles, input/precondition/oracle suggestions, and review questions; it **must not** modify CFG, `coverageItems`, `coverageTargets`, or `path`.
+- **Reviewable**: QRA risks, coverage items, strategies, cases, white-box coverage checkboxes, and manual items can all be edited then saved/applied.
+- **Traceable**: `engineMetadata`, `timingMetrics`, `pipelineVersion` are saved with responses and history records.
 
 ---
 
-## 2. 系统架构与生成管线
+## 2. System Architecture and Generation Pipeline
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
-│                         浏览器  http://localhost:5173                     │
-│   Vue 3：QRA / 黑盒技术 Tab / White-Box Tab / Generated Results Summary │
+│                         Browser  http://localhost:5173                     │
+│   Vue 3: QRA / Black-Box Technique Tab / White-Box Tab / Generated Results Summary │
 └─────────────────────────────────┬────────────────────────────────────────┘
                                   │ HTTP
                                   ▼
 ┌──────────────────────────────────────────────────────────────────────────┐
 │                    Express Backend  :3000                                 │
-│   POST /api/qra · POST /api/testcases/generate · 符合性 · 落库 · 导出    │
+│   POST /api/qra · POST /api/testcases/generate · Compliance · Persist · Export    │
 └───────────────┬──────────────────────────────────────┬───────────────────┘
                 │                                      │
                 ▼                                      ▼
 ┌───────────────────────────────┐      ┌───────────────────────────────────┐
 │  FastAPI ai-service  :8000    │      │  PostgreSQL  :5432                 │
-│  generation_pipeline          │      │  generation_records（JSONB）       │
+│  generation_pipeline          │      │  generation_records (JSONB)       │
 │  blackbox_workers /           │      └───────────────────────────────────┘
 │  whitebox_java_worker         │
-│  LLM（OpenAI 兼容，可选）      │
+│  LLM (OpenAI-compatible, optional)      │
 └───────────────────────────────┘
 ```
 
-### 2.1 主生成流程（当前）
+### 2.1 Main Generation Flow (Current)
 
 1. `frontend/src/App.vue` → `POST /api/testcases/generate`
 2. `backend/src/index.js` → `ai-service` `POST /generate-testcases`
-3. `ai-service/app/main.py` 构造 `GlobalContext`（含 QRA 阶段确认的 `requirementsStructured`、`riskItems`）
-4. `ai-service/app/engines/generation_pipeline.py` 按 `selectedTechniques` 路由到对应 Worker，Reduce 阶段合并工件
-5. 返回 `testcases`、`artifacts`（含 `coverageItems`、`testSequences`、`llmEnhancedTestcases` 等）、`engineMetadata`、`timingMetrics`
+3. `ai-service/app/main.py` constructs `GlobalContext` (including QRA-confirmed `requirementsStructured`, `riskItems`)
+4. `ai-service/app/engines/generation_pipeline.py` routes to Workers by `selectedTechniques`, merges artifacts in Reduce phase
+5. Returns `testcases`, `artifacts` (including `coverageItems`, `testSequences`, `llmEnhancedTestcases`, etc.), `engineMetadata`, `timingMetrics`
 
-### 2.2 支持的 `selectedTechniques`
+### 2.2 Supported `selectedTechniques`
 
-| ID | 类型 | 说明 |
+| ID | Type | Description |
 | --- | --- | --- |
-| `EP` | 黑盒 | 等价类划分 |
-| `BVA` | 黑盒 | 边界值分析 |
-| `DecisionTable` | 黑盒 | 决策表 |
-| `Combinatorial` | 黑盒 | Pairwise 组合 |
-| `StateTransition` | 黑盒 | 状态迁移（LLM + `state_model_engine` 降级） |
-| `WhiteBoxJava` | 白盒 | Java 方法级 CFG、statement/branch 覆盖项与 test sequences |
-| `Oracle` | 后处理 | 为用例附加 oracle |
-| `Optimization` | 后处理 | `risk-first` / `minimize` 套件优化 |
+| `EP` | Black-box | Equivalence Partitioning |
+| `BVA` | Black-box | Boundary Value Analysis |
+| `DecisionTable` | Black-box | Decision Table |
+| `Combinatorial` | Black-box | Pairwise combinatorial |
+| `StateTransition` | Black-box | State transition (LLM + `state_model_engine` fallback) |
+| `WhiteBoxJava` | White-box | Java method-level CFG, statement/branch coverage items and test sequences |
+| `Oracle` | Post-processing | Attach oracle to test cases |
+| `Optimization` | Post-processing | `risk-first` / `minimize` suite optimization |
 
-### 2.3 运行模式
+### 2.3 Operating Modes
 
-| 模式 | 条件 | 行为 |
+| Mode | Condition | Behavior |
 | --- | --- | --- |
-| 离线 / 确定性 | `OPENAI_API_KEY` 为空或 LLM 失败 | 黑盒 fallback、白盒 CFG 与序列仍可用；白盒增强区显示 `promptPreview` |
-| 在线增强 | 配置 `OPENAI_API_KEY`、`OPENAI_BASE_URL`、`OPENAI_MODEL` | 黑盒用例更贴近 prompt；白盒输出 `llmEnhancedTestcases` 自然语言设计说明 |
+| Offline / deterministic | `OPENAI_API_KEY` empty or LLM failure | Black-box fallback, white-box CFG and sequences still available; white-box enhancement area shows `promptPreview` |
+| Online enhancement | Configure `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `OPENAI_MODEL` | Black-box cases closer to prompt; white-box outputs `llmEnhancedTestcases` natural-language design notes |
 
 ---
 
-## 3. 功能与 Assignment2 符合性
+## 3. Features and Assignment 2 Compliance
 
-### 3.1 功能性需求（FR）
+### 3.1 Functional Requirements (FR)
 
-| FR | 描述 | 实现状态 | 主要实现 |
+| FR | Description | Implementation Status | Primary Implementation |
 | --- | --- | --- | --- |
-| **FR 1.0** | CSV / 纯文本 / 文件导入 | ✅ | 前端多源输入；`requirement_parser` |
-| **FR 1.1** | 需求结构化 | ✅ | QRA → `requirementsStructured` |
-| **FR 2.0** | 风险分与 H/M/L 优先级 | ✅ | `riskScore = impact × likelihood`；`POST /api/qra` |
-| **FR 3.0** | ≥3 种黑盒技术 | ✅ | EP、BVA、DecisionTable、Combinatorial、StateTransition（5 种可独立生成） |
-| **FR 4.0** | 白盒覆盖与序列 | ✅ 加分 | `WhiteBoxJava`（CFG）；`StateTransition` 仍可用状态模型 |
-| **FR 5.0** | 测试预言 | ✅ 加分 | `Oracle` worker；用例 `oracle` 字段 |
-| **FR 6.0** | JSON / CSV / Excel 导出 | ✅ | `.xlsx` 四表；Markdown（含 LLM 白盒增强段） |
-| **FR 7.0** | 套件优化 | ✅ 加分 | `Optimization` worker；`testSuiteOptimization` |
-| **交互式审查** | 编辑并应用变更 | ✅ | QRA 风险、汇总区覆盖/策略/用例/追溯分 Tab 保存 |
+| **FR 1.0** | CSV / plain text / file import | ✅ | Frontend multi-source input; `requirement_parser` |
+| **FR 1.1** | Requirement structuring | ✅ | QRA → `requirementsStructured` |
+| **FR 2.0** | Risk score and H/M/L priority | ✅ | `riskScore = impact × likelihood`; `POST /api/qra` |
+| **FR 3.0** | ≥3 black-box techniques | ✅ | EP, BVA, DecisionTable, Combinatorial, StateTransition (5 techniques, independently generatable) |
+| **FR 4.0** | White-box coverage and sequences | ✅ Bonus | `WhiteBoxJava` (CFG); `StateTransition` still uses state model |
+| **FR 5.0** | Test oracle | ✅ Bonus | `Oracle` worker; test case `oracle` field |
+| **FR 6.0** | JSON / CSV / Excel export | ✅ | `.xlsx` four sheets; Markdown (including LLM white-box enhancement section) |
+| **FR 7.0** | Suite optimization | ✅ Bonus | `Optimization` worker; `testSuiteOptimization` |
+| **Interactive review** | Edit and apply changes | ✅ | QRA risks, summary coverage/strategy/cases/traceability saved per tab |
 
-### 3.2 非功能性需求（NFR）
+### 3.2 Non-Functional Requirements (NFR)
 
-| NFR | 说明 |
+| NFR | Description |
 | --- | --- |
-| 性能 | 管线记录 `engineMs`、`engineMeetsNfr`、`totalMs` |
-| 可用性 | 四主 Tab 工作流、FitnessAI 示例、按技术单独生成 |
-| 安全 | API Key 仅环境变量；生产需收紧 CORS |
-| 可维护性 | Worker 分文件；`generation_pipeline` 单一编排入口；Docker Compose 部署 |
+| Performance | Pipeline records `engineMs`, `engineMeetsNfr`, `totalMs` |
+| Usability | Four main-tab workflow, FitnessAI sample, per-technique generation |
+| Security | API Key via environment variables only; tighten CORS in production |
+| Maintainability | Workers in separate files; `generation_pipeline` single orchestration entry; Docker Compose deployment |
 
 ---
 
-## 4. 仓库结构
+## 4. Repository Structure
 
 ```
 Software-Test-Assignment/
 ├── frontend/
-│   └── src/App.vue              # QRA / 黑盒 / 白盒 / 结果汇总 Tab
+│   └── src/App.vue              # QRA / Black-box / White-box / Results Summary tabs
 ├── backend/
 │   └── src/
-│       ├── index.js             # /api/qra、/api/testcases/generate、导出、历史
+│       ├── index.js             # /api/qra, /api/testcases/generate, export, history
 │       └── db.js
 ├── ai-service/
 │   ├── app/
-│   │   ├── main.py              # FastAPI：QRA、生成、导出
+│   │   ├── main.py              # FastAPI: QRA, generation, export
 │   │   ├── export_xlsx.py
 │   │   └── engines/
-│   │       ├── generation_pipeline.py   # 主入口 run_generation_pipeline
+│   │       ├── generation_pipeline.py   # Main entry run_generation_pipeline
 │   │       ├── blackbox_workers.py      # EP/BVA/DecisionTable/Combinatorial
-│   │       ├── blackbox_fallbacks.py    # 黑盒 LLM 降级
+│   │       ├── blackbox_fallbacks.py    # Black-box LLM fallback
 │   │       ├── state_transition_worker.py
-│   │       ├── state_model_engine.py    # StateTransition 确定性状态模型
+│   │       ├── state_model_engine.py    # StateTransition deterministic state model
 │   │       ├── whitebox_java_analyzer.py
 │   │       ├── whitebox_coverage.py
 │   │       ├── whitebox_sequence_generator.py
@@ -177,7 +177,7 @@ Software-Test-Assignment/
 │   │       ├── oracle_engine.py / suite_optimizer.py / strategy_builder.py
 │   │       └── schema_validator.py
 │   └── tests/                   # python -m unittest discover -s tests
-├── fitnessai-java-tests/        # FitnessAI 相关 Java 测试样例
+├── fitnessai-java-tests/        # FitnessAI-related Java test samples
 ├── infra/postgres/init.sql
 ├── docker-compose.yml
 ├── GENERATION_PIPELINE_REFACTOR_SUMMARY.md
@@ -188,38 +188,38 @@ Software-Test-Assignment/
 └── README.md
 ```
 
-> 前端默认 **本地** `npm run dev`，不打包进 Docker；`postgres`、`ai-service`、`backend` 由 Compose 构建。
+> Frontend runs locally by default via **npm run dev**, not packaged in Docker; `postgres`, `ai-service`, `backend` are built by Compose.
 
 ---
 
-## 5. 环境准备
+## 5. Environment Setup
 
-### 5.1 先决条件
+### 5.1 Prerequisites
 
 - **Windows / macOS / Linux**
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/)
-- **Node.js 20+** 与 **npm 10+**（前端）
-- （可选）Python 3.11+（本地跑 `ai-service/tests`）
+- **Node.js 20+** and **npm 10+** (frontend)
+- (Optional) Python 3.11+ (run `ai-service/tests` locally)
 
-### 5.2 环境变量
+### 5.2 Environment Variables
 
-在项目根目录创建 `.env`（可参考 Compose 中 `postgres` / `ai-service` 所用变量）：
+Create `.env` in the project root (refer to variables used by `postgres` / `ai-service` in Compose):
 
-| 变量 | 说明 |
+| Variable | Description |
 | --- | --- |
-| `POSTGRES_*` | 数据库连接 |
-| `BACKEND_PORT` | 默认 `3000` |
-| `AI_SERVICE_PORT` | 默认 `8000` |
-| `OPENAI_API_KEY` | 留空则黑盒/白盒增强走 fallback 或 preview |
-| `OPENAI_MODEL` | 如 `deepseek-chat`、`gpt-4o-mini` |
-| `OPENAI_BASE_URL` | OpenAI 兼容网关 |
-| `TEST_TECHNIQUE` | 默认 `black-box` |
+| `POSTGRES_*` | Database connection |
+| `BACKEND_PORT` | Default `3000` |
+| `AI_SERVICE_PORT` | Default `8000` |
+| `OPENAI_API_KEY` | Leave empty for black-box/white-box enhancement fallback or preview |
+| `OPENAI_MODEL` | e.g. `deepseek-chat`, `gpt-4o-mini` |
+| `OPENAI_BASE_URL` | OpenAI-compatible gateway |
+| `TEST_TECHNIQUE` | Default `black-box` |
 
 ---
 
-## 6. 快速启动
+## 6. Quick Start
 
-### 6.1 启动后端栈（Docker）
+### 6.1 Start Backend Stack (Docker)
 
 ```powershell
 cd Software-Test-Assignment
@@ -227,15 +227,15 @@ docker compose up -d --build
 docker compose ps
 ```
 
-预期容器 **Up**（`ai-service` 为 **healthy**）：
+Expected containers **Up** (`ai-service` **healthy**):
 
-| 容器名 | 端口 |
+| Container Name | Port |
 | --- | --- |
 | `aitest-postgres` | 5432 |
 | `aitest-ai-service` | 8000 |
 | `aitest-backend` | 3000 |
 
-健康检查：
+Health checks:
 
 ```powershell
 Invoke-RestMethod http://localhost:3000/health
@@ -243,7 +243,7 @@ Invoke-RestMethod http://localhost:8000/health
 Invoke-RestMethod http://localhost:3000/api/engines/info
 ```
 
-### 6.2 启动前端（本地）
+### 6.2 Start Frontend (Local)
 
 ```powershell
 cd frontend
@@ -251,63 +251,63 @@ npm install
 npm run dev
 ```
 
-浏览器访问：**http://localhost:5173**
+Open in browser: **http://localhost:5173**
 
-### 6.3 修改代码后
+### 6.3 After Code Changes
 
-| 改动位置 | 操作 |
+| Change Location | Action |
 | --- | --- |
-| `backend/` 或 `ai-service/` | `docker compose up -d --build` |
-| `frontend/` | 重启 `npm run dev`，浏览器 **Ctrl+F5** |
+| `backend/` or `ai-service/` | `docker compose up -d --build` |
+| `frontend/` | Restart `npm run dev`, browser **Ctrl+F5** |
 
-### 6.4 停止
+### 6.4 Stop
 
 ```powershell
-docker compose down          # 保留数据卷
-docker compose down -v       # 清空数据库（慎用）
+docker compose down          # Keep data volumes
+docker compose down -v       # Clear database (use with caution)
 ```
 
 ---
 
-## 7. 使用指南（QRA → 黑盒 → 白盒 → 汇总）
+## 7. User Guide (QRA → Black-Box → White-Box → Summary)
 
-### 7.1 推荐演示流程
+### 7.1 Recommended Demo Flow
 
-1. 打开前端，点击 **填入示例** 加载 FitnessAI 需求与全局 Prompt 草稿。
-2. 在 **Input and Generate** 侧栏填写/确认 **Overall Input Prompt**（项目范围、风险关注点、输出风格）。
-3. 主 Tab **QRA** → **Run QRA**，在子 Tab 中审查 **Structured Requirements** 与 **Risk Items**，保存风险编辑。
-4. 主 Tab **Black-Box Technique Test Design**：
-   - 勾选要运行的技术（EP、BVA 等）；
-   - 在各技术的 **Technical Prompt** 中填写技术专用说明（见 [§8](#8-fitnessai-prompt-示例)）；
-   - 按技术 **Generate**（可一次一种，便于审查）。
-5. 主 Tab **White-Box Technique Test Design**：
-   - 选择 coverage criterion（如 `statement+branch`）；
-   - 粘贴 Java 片段或上传 `.java` 文件；
-   - 勾选 coverage items、可添加 manual coverage item；
-   - **Generate White-Box** → 查看 Java Analysis Result 与 **LLM Enhanced Test Design**。
-6. 主 Tab **Generated Results Summary**：浏览 **Coverage Items / Test Strategies / Test Cases / LLM Enhancements / Traceability**，分节保存编辑。
-7. 导出 **Markdown / JSON / CSV / Excel**；**History** 可回填记录。
+1. Open frontend, click **Load Sample** to load FitnessAI requirements and global Prompt draft.
+2. In **Input and Generate** sidebar, fill/confirm **Overall Input Prompt** (project scope, risk focus, output style).
+3. Main tab **QRA** → **Run QRA**, review **Structured Requirements** and **Risk Items** in sub-tabs, save risk edits.
+4. Main tab **Black-Box Technique Test Design**:
+   - Check techniques to run (EP, BVA, etc.);
+   - Fill **Technical Prompt** for each technique (see [§8](#8-fitnessai-prompt-examples));
+   - **Generate** per technique (one at a time for easier review).
+5. Main tab **White-Box Technique Test Design**:
+   - Select coverage criterion (e.g. `statement+branch`);
+   - Paste Java snippet or upload `.java` file;
+   - Check coverage items, add manual coverage items if needed;
+   - **Generate White-Box** → view Java Analysis Result and **LLM Enhanced Test Design**.
+6. Main tab **Generated Results Summary**: browse **Coverage Items / Test Strategies / Test Cases / LLM Enhancements / Traceability**, save edits per section.
+7. Export **Markdown / JSON / CSV / Excel**; **History** can restore records.
 
-### 7.2 输入方式
+### 7.2 Input Methods
 
-| 方式 | 操作 |
+| Method | Action |
 | --- | --- |
-| 纯文本 | Manual requirements 文本框 |
-| CSV | CSV requirements（含 `id,feature,input,condition,expected` 表头） |
-| 文件 | 导入 `.md` / `.txt` 等至 `documents[]` |
-| 示例 | **填入示例** |
-| 白盒 | Java 手动粘贴或文件上传（`sourceType: codebase`） |
+| Plain text | Manual requirements text box |
+| CSV | CSV requirements (with `id,feature,input,condition,expected` header) |
+| File | Import `.md` / `.txt` etc. into `documents[]` |
+| Sample | **Load Sample** |
+| White-box | Java manual paste or file upload (`sourceType: codebase`) |
 
-### 7.3 Prompt 分工
+### 7.3 Prompt Responsibilities
 
-- **Overall Input Prompt**（侧栏）：描述 FitnessAI 项目、测试范围、风险与期望的输出风格（用例标题、输入、oracle、优先级、追溯）。
-- **Technical Prompt**（各黑盒技术）：仅写该技术相关约束（等价类域、边界簇、决策表规则、因子水平、状态迁移路径等）。
+- **Overall Input Prompt** (sidebar): Describe FitnessAI project, test scope, risks, and expected output style (case titles, inputs, oracle, priority, traceability).
+- **Technical Prompt** (each black-box technique): Write only technique-specific constraints (equivalence domains, boundary clusters, decision table rules, factor levels, state transition paths, etc.).
 
 ---
 
-## 8. FitnessAI Prompt 示例
+## 8. FitnessAI Prompt Examples
 
-以下与仓库内示例文档一致，可直接复制到前端对应输入框。
+The following matches in-repo sample docs; copy directly into the corresponding frontend input fields.
 
 ### 8.1 Overall Input Prompt
 
@@ -319,44 +319,44 @@ Please generate test cases from the reviewed QRA requirements and risk items. Fo
 Use clear test case titles, explicit input data, expected results/oracles, priority, and traceability to requirement or risk IDs. Keep the output suitable for manual review and later automation.
 ```
 
-### 8.2 各黑盒 Technical Prompt（摘要）
+### 8.2 Black-Box Technical Prompts (Summary)
 
-| 技术 | 要点 |
+| Technique | Key Points |
 | --- | --- |
-| **EP** | `exerciseType`、`landmarks`、难度、`skipRest`、`count`、`durationSeconds`、`weightKg`、`durationHours` 等等价类；正负代表用例各一；链接 REQ id |
-| **BVA** | `landmarks.length` 32/33/34；`count` 2/3/4；`durationSeconds` 29/30/31；`weightKg` 边界；`durationHours` 0 与小正数 |
-| **Decision Table** | 记录保存：`count`/`durationSeconds` 与 saved/not saved；计划难度与 `skipRest` |
-| **Combinatorial** | `exerciseType`、`difficulty`、`skipRest`、记录分类、输入有效性等因素的 pairwise |
-| **State Transition** | UP/DESCENDING/DOWN/ASCENDING；合法完整循环、非法短路径、重复帧、cooldown 与 count 变化 |
+| **EP** | Equivalence classes for `exerciseType`, `landmarks`, difficulty, `skipRest`, `count`, `durationSeconds`, `weightKg`, `durationHours`; one positive and one negative representative case each; link REQ ids |
+| **BVA** | `landmarks.length` 32/33/34; `count` 2/3/4; `durationSeconds` 29/30/31; `weightKg` boundaries; `durationHours` 0 and small positive values |
+| **Decision Table** | Record save: `count`/`durationSeconds` vs saved/not saved; plan difficulty and `skipRest` |
+| **Combinatorial** | Pairwise of `exerciseType`, `difficulty`, `skipRest`, record classification, input validity factors |
+| **State Transition** | UP/DESCENDING/DOWN/ASCENDING; valid full cycle, illegal short paths, duplicate frames, cooldown and count changes |
 
 ---
 
-## 9. API 参考
+## 9. API Reference
 
-### 9.1 Backend（`:3000`）
+### 9.1 Backend (`:3000`)
 
-| 方法 | 路径 | 说明 |
+| Method | Path | Description |
 | --- | --- | --- |
-| GET | `/health` | 健康检查 |
-| GET | `/api/target-application` | FitnessAI 元数据 |
-| GET | `/api/engines/info` | FR 模块与管线能力说明 |
-| POST | `/api/qra` | **QRA**：结构化需求 + 风险评分（确定性引擎） |
-| POST | `/api/testcases/generate` | **主生成接口**（转发 ai-service） |
-| GET | `/api/history?limit=20` | 历史记录 |
-| DELETE | `/api/history/:id` | 删除历史 |
-| GET | `/api/risk-matrix` | 风险矩阵 |
+| GET | `/health` | Health check |
+| GET | `/api/target-application` | FitnessAI metadata |
+| GET | `/api/engines/info` | FR modules and pipeline capability description |
+| POST | `/api/qra` | **QRA**: structured requirements + risk scoring (deterministic engine) |
+| POST | `/api/testcases/generate` | **Main generation endpoint** (forwards to ai-service) |
+| GET | `/api/history?limit=20` | History records |
+| DELETE | `/api/history/:id` | Delete history |
+| GET | `/api/risk-matrix` | Risk matrix |
 | POST | `/api/export/artifacts` | JSON / CSV / xlsx |
-| GET | `/api/analysis/experiment?limit=200` | 实验统计 |
+| GET | `/api/analysis/experiment?limit=200` | Experiment statistics |
 
 #### `POST /api/qra`
 
-请求体：`sourceType`、`content`、`documents`（与生成接口输入段一致）。
+Request body: `sourceType`, `content`, `documents` (same input segment as generation endpoint).
 
-响应：`requirementsStructured`、`riskItems`、`engineMetadata`、`timingMetrics`。
+Response: `requirementsStructured`, `riskItems`, `engineMetadata`, `timingMetrics`.
 
 #### `POST /api/testcases/generate`
 
-黑盒示例（需先完成 QRA 并将审查后的结构传入）：
+Black-box example (complete QRA first and pass reviewed structure):
 
 ```json
 {
@@ -375,7 +375,7 @@ Use clear test case titles, explicit input data, expected results/oracles, prior
 }
 ```
 
-白盒 `WhiteBoxJava` 示例：
+White-box `WhiteBoxJava` example:
 
 ```json
 {
@@ -390,46 +390,46 @@ Use clear test case titles, explicit input data, expected results/oracles, prior
 }
 ```
 
-预期（白盒）：
+Expected (white-box):
 
-- `testcases[*].designMethod` 为 `WhiteBoxJava`，`technique` 为 `white-box`
-- `artifacts.coverageItems` 含 statement / branch 项
-- `artifacts.testSequences` 含 `path`、`pathConstraints`、`inputHints`、`setupHints` 等
-- `artifacts.llmEnhancedTestcases` 存在；配置 LLM 后含自然语言增强
+- `testcases[*].designMethod` is `WhiteBoxJava`, `technique` is `white-box`
+- `artifacts.coverageItems` includes statement / branch items
+- `artifacts.testSequences` includes `path`, `pathConstraints`, `inputHints`, `setupHints`, etc.
+- `artifacts.llmEnhancedTestcases` exists; with LLM configured, includes natural-language enhancement
 
-响应常见字段：`artifacts`、`testcases`、`assignmentCompliance`、`engineMetadata`、`timingMetrics`、`quality`。
+Common response fields: `artifacts`, `testcases`, `assignmentCompliance`, `engineMetadata`, `timingMetrics`, `quality`.
 
-### 9.2 AI Service（`:8000`）
+### 9.2 AI Service (`:8000`)
 
-| 方法 | 路径 | 说明 |
+| Method | Path | Description |
 | --- | --- | --- |
-| POST | `/generate-testcases` | generation_pipeline 生成 |
-| POST | `/qra`（若直接调用） | 同 QRA 逻辑 |
-| GET | `/api/risk-matrix` | 风险矩阵 |
-| POST | `/export-artifacts` | xlsx 二进制 |
-| GET | `/prompt-template` | Prompt 模板预览 |
+| POST | `/generate-testcases` | generation_pipeline generation |
+| POST | `/qra` (if called directly) | Same QRA logic |
+| GET | `/api/risk-matrix` | Risk matrix |
+| POST | `/export-artifacts` | xlsx binary |
+| GET | `/prompt-template` | Prompt template preview |
 
 ---
 
-## 10. 引擎与 Worker 模块
+## 10. Engine and Worker Modules
 
-路径：`ai-service/app/engines/`
+Path: `ai-service/app/engines/`
 
-| 模块 | 职责 |
+| Module | Responsibility |
 | --- | --- |
-| `generation_pipeline.py` | 主入口：`GlobalContext`、路由、Reduce、`PIPELINE_VERSION` |
-| `blackbox_workers.py` | 黑盒 5 技术；优先 LLM，失败则 fallback |
-| `blackbox_fallbacks.py` | 确定性黑盒用例与覆盖项辅助 |
+| `generation_pipeline.py` | Main entry: `GlobalContext`, routing, Reduce, `PIPELINE_VERSION` |
+| `blackbox_workers.py` | Black-box 5 techniques; LLM first, fallback on failure |
+| `blackbox_fallbacks.py` | Deterministic black-box cases and coverage item helpers |
 | `state_transition_worker.py` / `state_model_engine.py` | StateTransition |
-| `whitebox_java_*.py` + `input_hint_generator.py` | Java CFG、覆盖项、序列、输入提示 |
-| `whitebox_llm_enhancer.py` | 白盒序列的自然语言增强（不改 CFG/path） |
+| `whitebox_java_*.py` + `input_hint_generator.py` | Java CFG, coverage items, sequences, input hints |
+| `whitebox_llm_enhancer.py` | Natural-language enhancement of white-box sequences (does not modify CFG/path) |
 | `requirement_parser.py` / `risk_engine.py` | FR 1.x / 2.0 |
 | `oracle_engine.py` / `suite_optimizer.py` | Oracle / Optimization worker |
-| `strategy_builder.py` / `schema_validator.py` | 策略映射、LLM JSON 校验 |
+| `strategy_builder.py` / `schema_validator.py` | Strategy mapping, LLM JSON validation |
 
-`engines/__init__.py` 仅导出 `run_generation_pipeline`。
+`engines/__init__.py` exports only `run_generation_pipeline`.
 
-本地测试：
+Local testing:
 
 ```powershell
 cd ai-service
@@ -438,58 +438,54 @@ python -m unittest discover -s tests
 
 ---
 
-## 11. 导出与历史
+## 11. Export and History
 
-| 格式 | 说明 |
+| Format | Description |
 | --- | --- |
-| Markdown | 含结构化用例与 **LLM enhanced white-box design** 段 |
-| JSON | 完整 `artifacts` + `testcases` |
-| CSV | 扁平化用例表 |
-| Excel `.xlsx` | Requirements / Risks / Strategies / TestCases 四表 |
+| Markdown | Structured cases and **LLM enhanced white-box design** section |
+| JSON | Full `artifacts` + `testcases` |
+| CSV | Flattened case table |
+| Excel `.xlsx` | Requirements / Risks / Strategies / TestCases four sheets |
 
-每次成功生成写入 `generation_records`；**History → View** 可恢复 QRA 与生成结果至审查区。
+Each successful generation writes to `generation_records`; **History → View** restores QRA and generation results to the review area.
 
 ---
 
-## 12. 测试与验证
+## 12. Testing and Verification
 
 ```powershell
-# 容器重建
+# Rebuild containers
 docker compose up -d --build
 
-# 前端构建
+# Frontend build
 cd frontend && npm run build
 
-# ai-service 单元测试
+# ai-service unit tests
 cd ai-service && python -m unittest discover -s tests
 
-# 后端语法检查
+# Backend syntax check
 cd backend && node --check src/index.js
 ```
 
-冒烟清单：
+Smoke checklist:
 
-- [ ] `http://localhost:3000/health` 与 `http://localhost:8000/health` 正常
-- [ ] Run QRA → 有风险项与结构化需求
-- [ ] 单选 `EP` 生成 → 用例 `designMethod` 为 `EP`
-- [ ] `WhiteBoxJava` 生成 → `testSequences` 与 `coverageItems` 非空
-- [ ] Summary 中 **LLM Enhancements** 可查看（或 preview 警告）
-- [ ] xlsx 四表可打开；History 可 View / Delete
+- [ ] `http://localhost:3000/health` and `http://localhost:8000/health` OK
+- [ ] Run QRA → risk items and structured requirements present
+- [ ] Select `EP` only → cases have `designMethod` `EP`
+- [ ] `WhiteBoxJava` generation → `testSequences` and `coverageItems` non-empty
+- [ ] Summary **LLM Enhancements** viewable (or preview warning)
+- [ ] xlsx four sheets openable; History View / Delete works
 
 ---
 
-## 13. 相关文档
+## 13. Related Documentation
 
-| 文档 | 用途 |
+| Document | Purpose |
 | --- | --- |
-| [GENERATION_PIPELINE_REFACTOR_SUMMARY.md](GENERATION_PIPELINE_REFACTOR_SUMMARY.md) | 管线重构目标、Worker 划分、白盒 LLM 边界、验证步骤 |
-| [FitnessAI_PROMPT_EXAMPLES.md](FitnessAI_PROMPT_EXAMPLES.md) | Overall + 各黑盒 Technical Prompt 全文 |
-| [FitnessAI_LLM_CONTEXT.md](FitnessAI_LLM_CONTEXT.md) | 目标应用需求与接口 |
-| [DEVELOPMENT_LOG.md](DEVELOPMENT_LOG.md) | FR 深度对照与测试流程 |
-| [Assignment2.md](Assignment2.md) | 课程作业原文 |
+| [FitnessAI_PROMPT_EXAMPLES.md](FitnessAI_PROMPT_EXAMPLES.md) | Full Overall + black-box Technical Prompts |
 
 ---
 
-## 许可证与课程说明
+## License and Course Notice
 
-本项目为课程作业实现，目标应用 **FitnessAI** 仅用于验证 AutoTestDesign 工具有效性。使用 LLM 时请遵守校方与 API 服务商规定，勿将真实 API Key 提交至公开仓库。
+This project is a course assignment implementation. Target application **FitnessAI** is used only to validate AutoTestDesign tool effectiveness. When using LLM, comply with university and API provider policies; do not commit real API Keys to public repositories.
