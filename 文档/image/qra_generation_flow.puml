@@ -5,17 +5,17 @@ skinparam backgroundColor transparent
 skinparam shadowing false
 
 start
-:将 FitnessAI 需求输入工具;
-:QRA 引擎解析需求并提取特征权重;
-:生成 10 条结构化风险项;
-:人工交互审查;
+:Input FitnessAI requirements into the tool;
+:QRA engine parses requirements and extracts feature weights;
+:Generate 10 structured risk items;
+:Conduct interactive human review;
 note right
-将 REQ-POSE-001 的 Impact
-由 4 调整为 5
+Adjust the Impact of REQ-POSE-001
+from 4 to 5
 end note
 :Recalculate;
 :Save Changes;
-:导出 Excel / JSON 证据;
+:Export Excel / JSON evidence;
 stop
 
 @enduml

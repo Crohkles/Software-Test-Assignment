@@ -5,16 +5,17 @@ hide empty description
 skinparam backgroundColor transparent
 skinparam shadowing false
 
-[*] --> UP : 初始化 Session
-UP --> DESCENDING : 关节夹角变小
-DESCENDING --> DOWN : 进入最低点
-DOWN --> ASCENDING : 起身开始
-ASCENDING --> UP : 恢复直立 / count++
+[*] --> UP : Initialize session
+UP --> DESCENDING : Joint angle decreases
+DESCENDING --> DOWN : Reach the lowest position
+DOWN --> ASCENDING : Start rising
+ASCENDING --> UP : Return to upright / count++
 
 note right of UP
-TC-ST-005 对应独立 reset 接口：
+TC-ST-005 corresponds to an independent reset endpoint:
 POST /api/analyzer/reset/{type}
-该行为不作为主状态机内部状态节点表示
+This behavior is not modeled as an internal node
+of the primary state machine
 end note
 
 @enduml

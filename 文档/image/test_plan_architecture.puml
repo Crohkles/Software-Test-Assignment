@@ -5,9 +5,9 @@ skinparam backgroundColor transparent
 skinparam shadowing false
 left to right direction
 
-component "浏览器\nReact + TypeScript" as Browser
-component "MediaPipe Pose\n33 关键点" as MP
-component "Spring Boot 后端\nJava 17" as Backend
+component "Browser\nReact + TypeScript" as Browser
+component "MediaPipe Pose\n33 landmarks" as MP
+component "Spring Boot Backend\nJava 17" as Backend
 component "ExerciseController" as EC
 component "UserController" as UC
 component "MainController" as MC
@@ -16,7 +16,7 @@ component "Squat / Pushup /\nPlank / JumpingJack\nAnalyzer" as Analyzer
 component "UserService" as US
 database "PostgreSQL" as DB
 
-Browser --> MP : 摄像头数据
+Browser --> MP : Camera input
 MP --> Backend : HTTP REST
 Backend --> EC
 Backend --> UC
