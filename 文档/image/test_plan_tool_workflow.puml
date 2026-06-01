@@ -5,14 +5,14 @@ skinparam backgroundColor transparent
 skinparam shadowing false
 
 start
-:测试设计工程师输入 FitnessAI 需求;
-:AutoTestDesign 运行 QRA;
-:生成风险矩阵并交互审查;
-:生成黑盒 / 白盒用例;
-:导出 CSV / JSON / Excel;
-:测试执行工程师编写 JUnit5 + MockMvc 脚本;
-:运行脚本测试 FitnessAI;
-:记录结果并汇总分析;
+:Test design engineer inputs FitnessAI requirements;
+:AutoTestDesign runs QRA;
+:Generate the risk matrix and review it interactively;
+:Generate black-box and white-box test cases;
+:Export CSV / JSON / Excel artifacts;
+:Test execution engineer implements JUnit 5 + MockMvc scripts;
+:Execute the scripts against FitnessAI;
+:Record results and consolidate the analysis;
 stop
 
 @enduml

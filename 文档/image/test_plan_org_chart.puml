@@ -5,10 +5,10 @@ skinparam backgroundColor transparent
 skinparam shadowing false
 top to bottom direction
 
-rectangle "项目负责人（PM）\n进度把控、与导师沟通" as PM
-rectangle "测试设计工程师\n- 使用 AutoTestDesign 生成用例\n- 交互审查风险/覆盖项\n- 维护追溯关系" as Designer
-rectangle "测试执行工程师\n- 编写 JUnit5 + MockMvc 脚本\n- 执行安全与性能测试\n- 记录缺陷与结果" as Executor
-rectangle "开发支持工程师\n- 提供被测环境\n- 协助复现缺陷\n- 修复确认缺陷" as DevSupport
+rectangle "Project Manager (PM)\nSchedule control and supervisor communication" as PM
+rectangle "Test Design Engineer\n- Generate test cases with AutoTestDesign\n- Review risks and coverage items interactively\n- Maintain traceability" as Designer
+rectangle "Test Execution Engineer\n- Implement JUnit 5 + MockMvc scripts\n- Run security and performance tests\n- Record defects and results" as Executor
+rectangle "Development Support Engineer\n- Provide the test environment\n- Help reproduce defects\n- Confirm fixes" as DevSupport
 
 PM --> Designer
 PM --> Executor

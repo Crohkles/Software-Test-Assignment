@@ -15,9 +15,9 @@
 %
 % This work consists of all the *.tex and *.sty files in
 %   https://github.com/TJ-CSCCG/Tongji-Beamer
-\section{项目分析}
+\section{Project Analysis}
 
-\begin{frame}{风险分析}
+\begin{frame}{Risk Analysis Evidence}
     \begin{columns}[T]
         \column{0.48\textwidth}
         \begin{figure}
@@ -32,65 +32,113 @@
         \end{figure}
     \end{columns}
 
-    \vspace{0.4em}
+    \vspace{0.35em}
     \footnotesize
     \begin{itemize}
-        \item 工具先输出 10 条结构化风险项，\texttt{REQ-POSE-001} 初始 \texttt{Impact=4}、\texttt{Risk Score=12}
-        \item 人工审查后将 \texttt{Impact} 调整为 5，保存后 \texttt{Risk Score=15}
-        \item 报告最终区分 22 条风险：工具 QRA 10 条，审查补充 12 条
-        \item 高优先级集中在越权访问、开放 CORS、高频姿态请求、仪表板数据语义一致性
+        \item The QRA engine generated 10 structured risk items from the FitnessAI requirements
+        \item \texttt{REQ-POSE-001} was reviewed from \texttt{Impact = 4} to \texttt{Impact = 5}, so the score changed from \texttt{12} to \texttt{15}
+        \item The screenshots show both the initial output and the saved review result
     \end{itemize}
 \end{frame}
 
-\begin{frame}{风险驱动测试策略}
+\begin{frame}{Risk Analysis Findings}
     \small
-    \begin{columns}[T]
-        \column{0.52\textwidth}
-        \begin{block}{高优先级风险}
-            \begin{itemize}
-                \item 越权访问：\texttt{/api/user/\{userId\}} 相关接口缺少鉴权
-                \item 开放跨域：\texttt{origins="*"} 带来的调用边界风险
-                \item 高频姿态请求：实时分析场景下潜在性能瓶颈
-                \item 仪表板统计：\texttt{duration} 字段语义与聚合口径需要核对
-            \end{itemize}
-        \end{block}
-
-        \column{0.42\textwidth}
-        \footnotesize
-        \begin{tabular}{@{}ll@{}}
-            \toprule
-            \textbf{优先级} & \textbf{对应套件} \\ \midrule
-            P1 & 安全测试 \\
-            P2 & 姿态分析 EP/BVA/ST \\
-            P3 & 记录过滤 DT/WBJ \\
-            P4 & 仪表板与历史记录 \\
-            P5 & 回归与扩展验证 \\
-            \bottomrule
-        \end{tabular}
-    \end{columns}
-
-    \vspace{0.5em}
-    \footnotesize
-    基本思路是先用 QRA 找出高风险路径，再把黑盒、白盒与自动化执行资源优先投入到这些路径上。
+    \begin{block}{Final Risk Summary}
+        \begin{itemize}
+            \item The final report contains 22 risks: 10 tool-generated items and 12 reviewer-supplemented items
+            \item The most critical risks are unauthorized access, open CORS, high-frequency pose requests, and inconsistent dashboard semantics
+            \item These findings directly determine the priority of the later test suites
+        \end{itemize}
+    \end{block}
 \end{frame}
 
-\begin{frame}{测试计划}
+\begin{frame}{Risk-Driven Test Strategy}
+    \small
+    \begin{block}{High-Priority Risks}
+        \begin{itemize}
+            \item Unauthorized access on user-related endpoints
+            \item Open CORS configuration with \texttt{origins="*"}
+            \item High-frequency pose requests in real-time scenarios
+            \item Dashboard \texttt{duration} semantics and aggregation consistency
+        \end{itemize}
+    \end{block}
+
+    \begin{block}{Strategy}
+        \begin{itemize}
+            \item QRA identifies the highest-risk paths first
+            \item Black-box, white-box, and automation effort is then assigned to those paths
+        \end{itemize}
+    \end{block}
+\end{frame}
+
+\begin{frame}{Risk Priority Mapping}
+    \begin{columns}[T]
+        \column{0.5\textwidth}
+        \footnotesize
+        \begin{block}{Priority to Suite Mapping}
+            \begin{tabular}{@{}ll@{}}
+                \toprule
+                \textbf{Priority} & \textbf{Target Suite} \\ \midrule
+                P1 & Security \\
+                P2 & Pose EP/BVA/ST \\
+                P3 & Record DT/WBJ \\
+                P4 & Dashboard / history \\
+                P5 & Regression \\
+                \bottomrule
+            \end{tabular}
+        \end{block}
+
+        \column{0.46\textwidth}
+        \footnotesize
+        \begin{block}{Why This Order}
+            \begin{itemize}
+                \setlength{\itemsep}{0.2em}
+                \item P1 targets direct security exposure
+                \item P2--P3 target core business behavior
+                \item P4--P5 cover consistency and regression
+            \end{itemize}
+            \begin{itemize}
+                \setlength{\itemsep}{0.2em}
+                \item Fix severe failures first
+                \item Then verify high-frequency paths
+                \item Finally expand regression coverage
+            \end{itemize}
+        \end{block}
+    \end{columns}
+\end{frame}
+
+\begin{frame}{Test Plan Scope}
+    \small
+    \begin{block}{Test Scope}
+        \begin{itemize}
+            \item Pose analysis, analyzer reset, record persistence, and history queries
+            \item Dashboard aggregation and response-field validation for \texttt{/api/exercises}
+            \item Security-risk validation and high-frequency request checks
+        \end{itemize}
+    \end{block}
+
+    \begin{block}{Planning Principles}
+        \begin{itemize}
+            \item Risk-first prioritization
+            \item Six design techniques integrated in one workflow
+            \item Tool generation, review, and execution kept traceable
+        \end{itemize}
+    \end{block}
+\end{frame}
+
+\begin{frame}{Test Plan Inventory}
     \begin{columns}[T]
         \column{0.52\textwidth}
         \footnotesize
-        \begin{block}{测试范围}
+        \begin{block}{Test Suites}
             \begin{itemize}
-                \item 姿态分析、分析器重置、记录保存与查询
-                \item 仪表板统计与 \texttt{/api/exercises} 返回字段校验
-                \item 安全风险验证与高频请求性能验证
-            \end{itemize}
-        \end{block}
-
-        \begin{block}{测试套件}
-            \begin{itemize}
-                \item EP 20 条，BVA 30 条，Decision Table 16 条
-                \item Pairwise 6 条，State Transition 5 条，WhiteBox 4 条
-                \item 合计 81 条，与工具导出结果一一对应
+                \item EP: 20 cases
+                \item BVA: 30 cases
+                \item Decision Table: 16 cases
+                \item Pairwise: 6 cases
+                \item State Transition: 5 cases
+                \item WhiteBox: 4 cases
+                \item Total: 81 cases
             \end{itemize}
         \end{block}
 
@@ -98,111 +146,151 @@
         \scriptsize
         \begin{tabular}{@{}lc@{}}
             \toprule
-            \textbf{计划项} & \textbf{结果} \\ \midrule
-            测试框架 & JUnit 5 + MockMvc \\
-            覆盖目标 & 风险优先 + 6 技术 \\
-            已完成阶段 & 工具生成 / 审查 / 执行 \\
-            待扩展阶段 & 安全 / 性能深化 \\
-            成本估算 & 39h vs 70h \\
-            效率提升 & 44\% \\
+            \textbf{Plan Item} & \textbf{Result} \\ \midrule
+            Framework & JUnit 5 + MockMvc \\
+            Coverage & Risk-first + 6 techniques \\
+            Stages & Generation / review / execution \\
+            Extensions & Security / performance depth \\
+            Cost & 39h vs 70h \\
+            Gain & 44\% \\
             \bottomrule
         \end{tabular}
     \end{columns}
 \end{frame}
 
-\begin{frame}{组织与流程}
+\begin{frame}{Organization}
     \small
-    \begin{block}{团队分工}
+    \begin{block}{Team Responsibilities}
         \begin{itemize}
-            \item 测试设计工程师：使用 AutoTestDesign 生成用例并执行交互审查  
-            \item 测试执行工程师：将 81 条用例落地为 JUnit 5 + MockMvc 脚本
-            \item 开发支持工程师：提供环境、复现问题、确认修复
-        \end{itemize}
-    \end{block}
-
-    \begin{block}{计划到执行的闭环}
-        \begin{itemize}
-            \item W1：QRA、六种技术生成、风险审查、导出工件
-            \item W2--W3：脚本实现与 81 条测试执行
-            \item W3--W4：安全 / 性能补充与报告整理
+            \item Test design engineer: generates cases with AutoTestDesign and performs interactive review
+            \item Test execution engineer: implements 81 cases with JUnit 5 + MockMvc
+            \item Development support engineer: prepares the environment, reproduces issues, and confirms fixes
         \end{itemize}
     \end{block}
 \end{frame}
 
-\begin{frame}{详细测试设计：EP 与 BVA}
+\begin{frame}{Workflow}
+    \small
+    \begin{block}{Closed Loop from Planning to Execution}
+        \begin{itemize}
+            \item W1: QRA, generation with six techniques, risk review, and artifact export
+            \item W2--W3: script implementation and execution of all 81 tests
+            \item W3--W4: security / performance supplements and report consolidation
+        \end{itemize}
+    \end{block}
+\end{frame}
+
+\begin{frame}{Detailed Test Design: EP}
     \begin{columns}[T]
         \column{0.42\textwidth}
         \scriptsize
-        \begin{block}{黑盒设计技术}
+        \begin{block}{Technique}
             \begin{itemize}
-                \item EP：覆盖合法/非法姿态、空请求、记录过滤、运动列表、仪表板
-                \item BVA：覆盖 \texttt{landmarks.length}、\texttt{count}、\texttt{duration}
+                \item EP covers valid and invalid poses, empty requests, record filtering, exercise lists, and dashboard flows
             \end{itemize}
         \end{block}
 
-        \begin{block}{设计结果}
+        \begin{block}{Result}
             \begin{itemize}
-                \item EP 20 条，负责输入域划分
-                \item BVA 30 条，负责边界取样
-                \item 两类技术直接覆盖姿态分析和记录过滤的核心输入空间
+                \item EP contributes 20 cases and partitions the core input domain
+                \item It gives the first broad black-box coverage layer
             \end{itemize}
         \end{block}
 
         \column{0.52\textwidth}
-        \includegraphics[width=0.82\textwidth]{contents/figure/fitnessai/Black_EP.png}
-
-        \vspace{0.25em}
-        \includegraphics[width=0.82\textwidth]{contents/figure/fitnessai/Black_BVA.png}
+        \includegraphics[width=0.9\textwidth]{contents/figure/fitnessai/Black_EP.png}
     \end{columns}
 \end{frame}
 
-\begin{frame}{详细测试设计：DT 与 Pairwise}
+\begin{frame}{Detailed Test Design: BVA}
     \begin{columns}[T]
         \column{0.42\textwidth}
         \scriptsize
-        \begin{block}{黑盒设计技术}
+        \begin{block}{Technique}
             \begin{itemize}
-                \item Decision Table：覆盖记录过滤四规则、运动列表 difficulty 字段校验
-                \item Pairwise：覆盖历史记录筛选参数对 \texttt{exerciseType × minScore × sortBy}
+                \item BVA covers \texttt{landmarks.length}, \texttt{count}, and \texttt{duration}
             \end{itemize}
         \end{block}
 
-        \begin{block}{设计结果}
+        \begin{block}{Result}
             \begin{itemize}
-                \item Decision Table 16 条，负责规则组合
-                \item Pairwise 6 条，负责压缩参数组合空间
-                \item 黑盒总计 72 条，并支持在工具中单独审查与归档
+                \item BVA contributes 30 cases and samples critical boundaries
+                \item It is used to verify the risk-sensitive edges of pose and record inputs
             \end{itemize}
         \end{block}
 
         \column{0.52\textwidth}
-        \includegraphics[width=0.82\textwidth]{contents/figure/fitnessai/Black_DT.png}
-
-        \vspace{0.25em}
-        \includegraphics[width=0.82\textwidth]{contents/figure/fitnessai/Black_P.png}
+        \includegraphics[width=0.9\textwidth]{contents/figure/fitnessai/Black_BVA.png}
     \end{columns}
 \end{frame}
 
-\begin{frame}{关键设计实例}
-    \small
-    \begin{block}{边界值分析实例}
-        \begin{itemize}
-            \item 最初工具会把 \texttt{32/33/34} 视为对称边界，但真实实现不是严格的“只允许 33 点”
-            \item 最终经执行验证，\texttt{32} 点触发 \texttt{4xx}，而 \texttt{34/35} 点仍可兼容解析
-            \item 这个案例说明人工审查对 AI 生成结果是必要的
-        \end{itemize}
-    \end{block}
+\begin{frame}{Detailed Test Design: Decision Table}
+    \begin{columns}[T]
+        \column{0.42\textwidth}
+        \scriptsize
+        \begin{block}{Technique}
+            \begin{itemize}
+                \item Decision Table covers the four record-filtering rules and exercise-list difficulty validation
+            \end{itemize}
+        \end{block}
 
-    \begin{block}{决策表与组合测试实例}
+        \begin{block}{Result}
+            \begin{itemize}
+                \item It contributes 16 cases and covers rule combinations directly
+            \end{itemize}
+        \end{block}
+
+        \column{0.52\textwidth}
+        \includegraphics[width=0.9\textwidth]{contents/figure/fitnessai/Black_DT.png}
+    \end{columns}
+\end{frame}
+
+\begin{frame}{Detailed Test Design: Pairwise}
+    \begin{columns}[T]
+        \column{0.42\textwidth}
+        \scriptsize
+        \begin{block}{Technique}
+            \begin{itemize}
+                \item Pairwise covers parameter pairs over \texttt{exerciseType}, \texttt{minScore}, and \texttt{sortBy}
+            \end{itemize}
+        \end{block}
+
+        \begin{block}{Result}
+            \begin{itemize}
+                \item It contributes 6 cases and compresses the combination space
+                \item The black-box layer totals 72 cases and remains reviewable in the tool
+            \end{itemize}
+        \end{block}
+
+        \column{0.52\textwidth}
+        \includegraphics[width=0.9\textwidth]{contents/figure/fitnessai/Black_P.png}
+    \end{columns}
+\end{frame}
+
+\begin{frame}{Design Example: Boundary Validation}
+    \small
+    \begin{block}{Landmark Boundary Review}
         \begin{itemize}
-            \item 决策表覆盖 \texttt{count < 3 \&\& duration < 30} 的四种真假组合
-            \item Pairwise 不再停留在抽象 difficulty/skipRest，而是落到真实的历史记录筛选参数
-            \item 这样生成的测试更贴近现有 API 和自动化脚本
+            \item The tool first treated \texttt{32/33/34} as symmetric boundaries
+            \item Execution showed that \texttt{32} triggers \texttt{4xx}, while \texttt{34/35} still pass validation
+            \item The real implementation is therefore not a strict ``exactly 33 landmarks only'' model
+            \item This is a representative case where human review corrects AI-generated assumptions
         \end{itemize}
     \end{block}
 \end{frame}
 
-\begin{frame}{状态迁移与白盒}
+\begin{frame}{Design Example: Rules and Combinations}
+    \small
+    \begin{block}{Decision Table and Pairwise}
+        \begin{itemize}
+            \item The decision table covers all four truth combinations of \texttt{count < 3 \&\& duration < 30}
+            \item Pairwise uses real history-filter parameters: \texttt{exerciseType}, \texttt{minScore}, and \texttt{sortBy}
+            \item The generated cases stay close to the actual API instead of abstract variables
+        \end{itemize}
+    \end{block}
+\end{frame}
+
+\begin{frame}{State Transition and White-Box Testing}
     \begin{columns}[T]
         \column{0.32\textwidth}
         \includegraphics[width=\textwidth]{contents/figure/fitnessai/Black_ST.png}
@@ -217,30 +305,30 @@
     \vspace{0.4em}
     \footnotesize
     \begin{itemize}
-        \item State Transition：4 个主状态 + 1 个 reset 场景，共 5 条序列
-        \item WhiteBox Java：2 个方法实例、22 个覆盖项、4 条序列
-        \item 目标方法为 \texttt{saveExerciseRecord}，核心分支为 \texttt{count < 3 \&\& duration < 30}
+        \item State Transition: four primary states plus one reset scenario, for a total of five sequences
+        \item WhiteBox Java: two method instances, 22 coverage items, and four sequences
+        \item The target method is \texttt{saveExerciseRecord}, with the core branch \texttt{count < 3 \&\& duration < 30}
     \end{itemize}
 \end{frame}
 
-\begin{frame}{自动化执行结果}
+\begin{frame}{Automated Execution Results}
     \begin{columns}[T]
         \column{0.48\textwidth}
         \footnotesize
-        \begin{block}{执行配置}
+        \begin{block}{Execution Configuration}
             \begin{itemize}
-                \item 测试框架：JUnit 5 + MockMvc
-                \item 数据隔离：\texttt{@Transactional}
-                \item 报告：Allure + \texttt{TestResultExtension}
+                \item Test framework: JUnit 5 + MockMvc
+                \item Data isolation: \texttt{@Transactional}
+                \item Reporting: Allure + \texttt{TestResultExtension}
             \end{itemize}
         \end{block}
 
-        \begin{block}{执行结果}
+        \begin{block}{Execution Results}
             \begin{itemize}
-                \item 总用例数：81
-                \item 通过：81
-                \item 失败 / 错误 / 跳过：0 / 0 / 0
-                \item 成功率：100\%
+                \item Total test cases: 81
+                \item Passed: 81
+                \item Failed / errored / skipped: 0 / 0 / 0
+                \item Success rate: 100\%
             \end{itemize}
         \end{block}
 
@@ -249,7 +337,7 @@
     \end{columns}
 \end{frame}
 
-\begin{frame}{Allure 报告视图}
+\begin{frame}{Allure Report Views}
     \begin{columns}[T]
         \column{0.49\textwidth}
         \includegraphics[width=\textwidth]{contents/figure/fitnessai/allure-report-2.png}
@@ -260,68 +348,73 @@
 
     \vspace{0.5em}
     \footnotesize
-    左图展示测试套与分类视图，右图展示执行结果图表；二者共同支撑 81 条用例全部通过的结论。
+    The left image shows the suite and categorization view, while the right image shows execution charts. Together, they support the conclusion that all 81 test cases passed.
 \end{frame}
 
-\begin{frame}{覆盖率与修正}
+\begin{frame}{Coverage Results}
     \begin{columns}[T]
-        \column{0.48\textwidth}
+        \column{0.52\textwidth}
         \includegraphics[width=\textwidth]{contents/figure/fitnessai/Jacoco-1.png}
 
-        \vspace{0.3em}
+        \column{0.42\textwidth}
         \scriptsize
         \begin{tabular}{@{}lc@{}}
             \toprule
-            \textbf{对象} & \textbf{覆盖率} \\ \midrule
+            \textbf{Target} & \textbf{Coverage} \\ \midrule
             \texttt{saveExerciseRecord} & 100/100 \\
             \texttt{SquatAnalyzer} & 92.8 / 80.0 \\
             \texttt{ExerciseController} & 48.1 / 66.7 \\
             \bottomrule
         \end{tabular}
-
-        \column{0.48\textwidth}
-        \scriptsize
-        \begin{block}{基于证据的修正}
-            \begin{itemize}
-                \item \texttt{TC-BVA-002}：32 点不是有效边界，而是 \texttt{4xx} 拦截
-                \item \texttt{TC-ST-005}：最终落为 reset 接口验证，而非文案层 COOLDOWN
-                \item \texttt{TC-EP-017} / \texttt{TC-DT-015}：第三项 difficulty 当前实现为 \texttt{medium}
-            \end{itemize}
-        \end{block}
-
-        \begin{block}{结论}
-            \begin{itemize}
-                \item 工具负责高覆盖生成
-                \item 人工审查负责最后一跳语义对齐
-                \item 三份文档共同构成完整证据链
-            \end{itemize}
-        \end{block}
     \end{columns}
+
+    \vspace{0.5em}
+    \footnotesize
+    The evidence shows full coverage on the key persistence method and useful branch coverage on the pose-analysis path.
 \end{frame}
 
-\begin{frame}{工具价值与局限}
+\begin{frame}{Evidence-Based Corrections}
+    \small
+    \begin{block}{Corrections Found During Execution}
+        \begin{itemize}
+            \item \texttt{TC-BVA-002}: 32 landmarks are invalid and lead to \texttt{4xx}
+            \item \texttt{TC-ST-005}: the implemented check is the reset endpoint, not a narrative-level COOLDOWN state
+            \item \texttt{TC-EP-017} / \texttt{TC-DT-015}: the third \texttt{difficulty} item is currently \texttt{medium}
+        \end{itemize}
+    \end{block}
+
+    \begin{block}{Conclusion}
+        \begin{itemize}
+            \item The tool is responsible for high-coverage generation
+            \item Human review is responsible for final semantic alignment
+            \item Execution evidence closes the loop between design and implementation
+        \end{itemize}
+    \end{block}
+\end{frame}
+
+\begin{frame}{Tool Value and Limitations}
     \small
     \begin{columns}[T]
         \column{0.48\textwidth}
-        \begin{block}{工具价值}
+        \begin{block}{Tool Value}
             \begin{itemize}
-                \item 将需求、风险、覆盖项、用例和执行证据串起来
-                \item 支持交互审查，避免直接照搬 AI 输出
-                \item 对 API/业务规则型系统尤其有效
+                \item Connects requirements, risks, coverage items, test cases, and execution evidence
+                \item Supports interactive review instead of blindly accepting AI output
+                \item Is especially effective for API-centric systems with explicit business rules
             \end{itemize}
         \end{block}
 
         \column{0.48\textwidth}
-        \begin{block}{当前局限}
+        \begin{block}{Current Limitations}
             \begin{itemize}
-                \item UI 层与浏览器行为未作为本轮重点
-                \item 安全与性能测试仍以补充验证为主
-                \item 部分语义仍需依赖人工结合代码和执行结果校正
+                \item UI-layer behavior and browser-level behavior were not the focus of this round
+                \item Security and performance testing are still supplementary rather than exhaustive
+                \item Some semantics still require human correction based on code and execution evidence
             \end{itemize}
         \end{block}
     \end{columns}
 
     \vspace{0.5em}
     \footnotesize
-    因而本项目最终采用“工具生成 + 人工审查 + 自动化执行证据”三段式验证策略。
+    Therefore, the project ultimately adopts a three-stage validation strategy: tool generation + human review + automated execution evidence.
 \end{frame}
